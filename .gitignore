@@ -1,0 +1,5 @@
+/logs/
+/storage/
+/config/.env
+/vendor/
+*.log
