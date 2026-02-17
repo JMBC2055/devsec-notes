@@ -154,7 +154,12 @@ class AuthController {
             Session::set('username', $userData['username']);
             Session::set('email', $userData['email']);
             
-            Session::setFlash('success', '¡Bienvenido, ' . $userData['username'] . '!');
+            // === CORRECCIÓN XSS 18/02/2026 ===
+            // Sanitizar username antes de mostrar en flash message (previene XSS)
+            $safeUsername = Security::sanitize($userData['username']);
+            Session::setFlash('success', '¡Bienvenido, ' . $safeUsername . '!');
+            // ==============================
+            
             header('Location: /devsec-notes/public/index.php?page=dashboard');
         } else {
             Session::setFlash('error', 'Credenciales incorrectas o cuenta bloqueada');
@@ -173,3 +178,12 @@ class AuthController {
     }
 }
 ?>
+/**
+ * === CAMBIO SEGURIDAD: CORRECCIÓN XSS EN FLASH MESSAGE ===
+ * Fecha: 16/02/2026
+ * Autor: [TU NOMBRE AQUÍ]
+ * Descripción:
+ *   - Sanitizar username antes de mostrar en flash message (previene XSS)
+ *   - Cumple punto 2 del PDF: sanitización por contexto (HTML output)
+ * Reversión: Eliminar sanitización en línea del flash message si es necesario
+ */ 
