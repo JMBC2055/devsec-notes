@@ -290,13 +290,3 @@ class NoteController {
     }
 }
 ?>
-/**
- * === CAMBIO SEGURIDAD: MEJORAS NOTECONTROLLER (Puntos 2, 7, 8 del PDF) ===
- * Fecha: 16/02/2026
- * Autor: [TU NOMBRE AQUÍ]
- * Cambios realizados:
- *   1. Punto 2: Agregado cleanText() para validación de contenido + date() para formato de fecha
- *   2. Punto 7: try/catch en todos los métodos críticos + mensajes genéricos al usuario
- *   3. Punto 8: Logs de intentos fallidos de acceso/eliminación (error_log)
- * Reversión: Eliminar bloques try/catch y validaciones cleanText()/date() si es necesario
- */
