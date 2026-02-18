@@ -17,6 +17,7 @@ class User {
     public $username;
     public $email;
     public $password;
+    public $role;          // === NUEVO: campo role para autorización ===
     public $is_active;
     public $created_at;
     
@@ -34,8 +35,8 @@ class User {
      */
     public function register() {
         $query = "INSERT INTO " . $this->table . " 
-                  (username, email, password, is_active) 
-                  VALUES (:username, :email, :password, 1)";
+                  (username, email, password, role, is_active) 
+                  VALUES (:username, :email, :password, :role, 1)";
         
         $stmt = $this->conn->prepare($query);
         
@@ -46,6 +47,7 @@ class User {
         $stmt->bindParam(':username', $this->username);
         $stmt->bindParam(':email', $this->email);
         $stmt->bindParam(':password', $hashedPassword);
+        $stmt->bindValue(':role', 'user'); // === NUEVO: role por defecto 'user' ===
         
         if ($stmt->execute()) {
             $this->id = $this->conn->lastInsertId();
@@ -63,7 +65,7 @@ class User {
      * @return array|false
      */
     public function login() {
-        $query = "SELECT id, username, email, password, is_active, 
+        $query = "SELECT id, username, email, password, role, is_active, 
                          failed_login_attempts, locked_until
                   FROM " . $this->table . " 
                   WHERE email = :email LIMIT 1";
@@ -101,7 +103,8 @@ class User {
                 return [
                     'id' => $row['id'],
                     'username' => $row['username'],
-                    'email' => $row['email']
+                    'email' => $row['email'],
+                    'role' => $row['role'] // === NUEVO: devolver role para almacenar en sesión ===
                 ];
             } else {
                 // Incrementar intentos fallidos
@@ -218,3 +221,5 @@ class User {
     }
 }
 ?>
+
+ */
