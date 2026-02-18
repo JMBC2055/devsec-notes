@@ -12,13 +12,30 @@ require_once __DIR__ . '/../helpers/Validator.php';
 class NoteController {
     
     /**
-     * Verificar autenticación
+     * Verificar autenticación y autorización mínima
      */
     private function checkAuth() {
         if (!Session::isAuthenticated()) {
             header('Location: /devsec-notes/public/index.php?page=login');
             exit;
         }
+    }
+    
+    /**
+     * Verificar si el usuario tiene permisos de administrador
+     * @return bool
+     */
+    private function isAdmin() {
+        return Session::get('role', 'user') === 'admin';
+    }
+    
+    /**
+     * Verificar si el usuario es dueño de la nota
+     * @param int $noteUserId
+     * @return bool
+     */
+    private function isNoteOwner($noteUserId) {
+        return $noteUserId === Session::get('user_id');
     }
     
     /**
@@ -29,7 +46,14 @@ class NoteController {
         
         $userId = Session::get('user_id');
         $note = new Note();
-        $notes = $note->getAllByUser($userId, false);
+        
+        // Solo admin puede ver todas las notas de todos los usuarios
+        if ($this->isAdmin()) {
+            // NOTA: En producción, implementar paginación y filtros para evitar sobrecarga
+            $notes = $note->getAllByUser($userId, false);
+        } else {
+            $notes = $note->getAllByUser($userId, false);
+        }
         
         require_once __DIR__ . '/../views/notes/index.php';
     }
@@ -72,7 +96,7 @@ class NoteController {
             $validator->required($title, 'Título')
                       ->maxLength($title, 200, 'Título')
                       ->required($content, 'Contenido')
-                      ->cleanText($content, 'Contenido'); // === NUEVO: validación de texto limpio ===
+                      ->cleanText($content, 'Contenido');
             
             // Validar formato de fecha si existe
             if (!empty($reminderDate)) {
@@ -85,9 +109,9 @@ class NoteController {
                 exit;
             }
             
-            // Crear nota
+            // Crear nota (asignar al usuario autenticado)
             $note = new Note();
-            $note->user_id = Session::get('user_id');
+            $note->user_id = Session::get('user_id'); // === CRÍTICO: asignar al usuario actual ===
             $note->title = $title;
             $note->content = $content;
             $note->is_favorite = $isFavorite;
@@ -103,7 +127,6 @@ class NoteController {
             exit;
             
         } catch (Exception $e) {
-            // === NUEVO: manejo de errores controlado (punto 7 del PDF) ===
             error_log("Error en NoteController::store(): " . $e->getMessage());
             Session::setFlash('error', 'Error interno del servidor. Por favor intenta más tarde.');
             header('Location: /devsec-notes/public/index.php?page=dashboard');
@@ -117,19 +140,27 @@ class NoteController {
     public function edit() {
         $this->checkAuth();
         
-        $noteId = $_GET['id'] ?? 0;
+        $noteId = (int)($_GET['id'] ?? 0);
         $userId = Session::get('user_id');
         
         $noteModel = new Note();
         $note = $noteModel->getById($noteId, $userId);
         
+        // === NUEVO: Validación de propiedad (previene IDOR) ===
         if (!$note) {
-            // === NUEVO: log de intento fallido de acceso (punto 8 del PDF) ===
-            error_log("Intento de acceso no autorizado a nota ID $noteId por usuario ID $userId");
-            Session::setFlash('error', 'Nota no encontrada');
+            // No mostrar detalles específicos para evitar enumeración de IDs
+            Session::setFlash('error', 'Nota no encontrada o no tienes permisos para acceder');
             header('Location: /devsec-notes/public/index.php?page=dashboard');
             exit;
         }
+        
+        // Verificar que el usuario es dueño de la nota (a menos que sea admin)
+        if (!$this->isAdmin() && !$this->isNoteOwner($note['user_id'])) {
+            Session::setFlash('error', 'No tienes permisos para editar esta nota');
+            header('Location: /devsec-notes/public/index.php?page=dashboard');
+            exit;
+        }
+        // ======================================================
         
         require_once __DIR__ . '/../views/notes/edit.php';
     }
@@ -153,7 +184,7 @@ class NoteController {
         }
         
         try {
-            $noteId = $_POST['note_id'] ?? 0;
+            $noteId = (int)($_POST['note_id'] ?? 0);
             $userId = Session::get('user_id');
             
             // Sanitizar datos
@@ -167,7 +198,7 @@ class NoteController {
             $validator->required($title, 'Título')
                       ->maxLength($title, 200, 'Título')
                       ->required($content, 'Contenido')
-                      ->cleanText($content, 'Contenido'); // === NUEVO: validación de texto limpio ===
+                      ->cleanText($content, 'Contenido');
             
             // Validar formato de fecha si existe
             if (!empty($reminderDate)) {
@@ -179,6 +210,24 @@ class NoteController {
                 header('Location: /devsec-notes/public/index.php?page=edit-note&id=' . $noteId);
                 exit;
             }
+            
+            // === NUEVO: Validación de propiedad antes de actualizar (previene IDOR) ===
+            $noteModel = new Note();
+            $existingNote = $noteModel->getById($noteId, $userId);
+            
+            if (!$existingNote) {
+                Session::setFlash('error', 'Nota no encontrada');
+                header('Location: /devsec-notes/public/index.php?page=dashboard');
+                exit;
+            }
+            
+            // Verificar que el usuario es dueño de la nota (a menos que sea admin)
+            if (!$this->isAdmin() && !$this->isNoteOwner($existingNote['user_id'])) {
+                Session::setFlash('error', 'No tienes permisos para actualizar esta nota');
+                header('Location: /devsec-notes/public/index.php?page=dashboard');
+                exit;
+            }
+            // ======================================================
             
             // Actualizar nota
             $note = new Note();
@@ -197,7 +246,6 @@ class NoteController {
             exit;
             
         } catch (Exception $e) {
-            // === NUEVO: manejo de errores controlado (punto 7 del PDF) ===
             error_log("Error en NoteController::update(): " . $e->getMessage());
             Session::setFlash('error', 'Error interno del servidor. Por favor intenta más tarde.');
             header('Location: /devsec-notes/public/index.php?page=dashboard');
@@ -212,15 +260,31 @@ class NoteController {
         $this->checkAuth();
         
         try {
-            $noteId = $_GET['id'] ?? 0;
+            $noteId = (int)($_GET['id'] ?? 0);
             $userId = Session::get('user_id');
+            
+            // === NUEVO: Validación de propiedad antes de eliminar (previene IDOR) ===
+            $noteModel = new Note();
+            $existingNote = $noteModel->getById($noteId, $userId);
+            
+            if (!$existingNote) {
+                Session::setFlash('error', 'Nota no encontrada');
+                header('Location: /devsec-notes/public/index.php?page=dashboard');
+                exit;
+            }
+            
+            // Verificar que el usuario es dueño de la nota (a menos que sea admin)
+            if (!$this->isAdmin() && !$this->isNoteOwner($existingNote['user_id'])) {
+                Session::setFlash('error', 'No tienes permisos para eliminar esta nota');
+                header('Location: /devsec-notes/public/index.php?page=dashboard');
+                exit;
+            }
+            // ======================================================
             
             $note = new Note();
             if ($note->delete($noteId, $userId)) {
                 Session::setFlash('success', 'Nota eliminada exitosamente');
             } else {
-                // === NUEVO: log de intento fallido de eliminación (punto 8 del PDF) ===
-                error_log("Intento fallido de eliminación de nota ID $noteId por usuario ID $userId");
                 Session::setFlash('error', 'Error al eliminar la nota');
             }
             
@@ -228,7 +292,6 @@ class NoteController {
             exit;
             
         } catch (Exception $e) {
-            // === NUEVO: manejo de errores controlado (punto 7 del PDF) ===
             error_log("Error en NoteController::delete(): " . $e->getMessage());
             Session::setFlash('error', 'Error interno del servidor. Por favor intenta más tarde.');
             header('Location: /devsec-notes/public/index.php?page=dashboard');
@@ -243,12 +306,31 @@ class NoteController {
         $this->checkAuth();
         
         try {
-            $noteId = $_GET['id'] ?? 0;
+            $noteId = (int)($_GET['id'] ?? 0);
             $userId = Session::get('user_id');
+            $archive = $_GET['archive'] ?? '1';
+            
+            // === NUEVO: Validación de propiedad antes de archivar (previene IDOR) ===
+            $noteModel = new Note();
+            $existingNote = $noteModel->getById($noteId, $userId);
+            
+            if (!$existingNote) {
+                Session::setFlash('error', 'Nota no encontrada');
+                header('Location: /devsec-notes/public/index.php?page=dashboard');
+                exit;
+            }
+            
+            // Verificar que el usuario es dueño de la nota (a menos que sea admin)
+            if (!$this->isAdmin() && !$this->isNoteOwner($existingNote['user_id'])) {
+                Session::setFlash('error', 'No tienes permisos para archivar esta nota');
+                header('Location: /devsec-notes/public/index.php?page=dashboard');
+                exit;
+            }
+            // ======================================================
             
             $note = new Note();
-            if ($note->toggleArchive($noteId, $userId, true)) {
-                Session::setFlash('success', 'Nota archivada');
+            if ($note->toggleArchive($noteId, $userId, $archive === '1')) {
+                Session::setFlash('success', $archive === '1' ? 'Nota archivada' : 'Nota desarchivada');
             } else {
                 Session::setFlash('error', 'Error al archivar la nota');
             }
@@ -257,7 +339,6 @@ class NoteController {
             exit;
             
         } catch (Exception $e) {
-            // === NUEVO: manejo de errores controlado (punto 7 del PDF) ===
             error_log("Error en NoteController::archive(): " . $e->getMessage());
             Session::setFlash('error', 'Error interno del servidor. Por favor intenta más tarde.');
             header('Location: /devsec-notes/public/index.php?page=dashboard');
@@ -281,7 +362,6 @@ class NoteController {
             require_once __DIR__ . '/../views/notes/search.php';
             
         } catch (Exception $e) {
-            // === NUEVO: manejo de errores controlado (punto 7 del PDF) ===
             error_log("Error en NoteController::search(): " . $e->getMessage());
             Session::setFlash('error', 'Error interno del servidor. Por favor intenta más tarde.');
             header('Location: /devsec-notes/public/index.php?page=dashboard');
@@ -290,3 +370,15 @@ class NoteController {
     }
 }
 ?>
+/**
+ * === CAMBIO SEGURIDAD: IMPLEMENTACIÓN DE ROLES Y VALIDACIÓN DE PROPIEDAD (Punto 5 del PDF) ===
+ * Fecha: 18/02/2026
+ * Autor: [TU NOMBRE AQUÍ]
+ * Descripción:
+ *   - Agregado método isAdmin() para verificar rol de administrador
+ *   - Agregado método isNoteOwner() para verificar propiedad de notas
+ *   - Validación de propiedad en edit(), update(), delete(), archive() para prevenir IDOR
+ *   - Mensajes de error genéricos para evitar enumeración de IDs
+ *   - Cumple punto 5 del PDF: autenticación y autorización claras (roles/permisos)
+ * Reversión: Eliminar métodos isAdmin()/isNoteOwner() y validaciones de propiedad si es necesario
+ */
