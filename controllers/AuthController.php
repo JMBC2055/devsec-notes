@@ -153,6 +153,7 @@ class AuthController {
             Session::set('user_id', $userData['id']);
             Session::set('username', $userData['username']);
             Session::set('email', $userData['email']);
+            Session::set('role', $userData['role']); // === NUEVO: Almacenar el rol en sesión ===
             
             // === CORRECCIÓN XSS 18/02/2026 ===
             // Sanitizar username antes de mostrar en flash message (previene XSS)
@@ -178,4 +179,13 @@ class AuthController {
     }
 }
 ?>
-
+/**
+ * === CAMBIO SEGURIDAD: ALMACENAMIENTO DE ROL EN SESIÓN (Punto 5 del PDF) ===
+ * Fecha: 18/02/2026
+ * Autor: [TU NOMBRE AQUÍ]
+ * Descripción:
+ *   - Agregada línea Session::set('role', $userData['role']) para almacenar el rol en sesión
+ *   - Esto permite validar permisos por rol en otros controladores
+ *   - Cumple punto 5 del PDF: autenticación y autorización claras (roles/permisos)
+ * Reversión: Eliminar línea Session::set('role', $userData['role']) si es necesario
+ */
