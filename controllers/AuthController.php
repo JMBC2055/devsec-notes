@@ -178,12 +178,4 @@ class AuthController {
     }
 }
 ?>
-/**
- * === CAMBIO SEGURIDAD: CORRECCIÓN XSS EN FLASH MESSAGE ===
- * Fecha: 16/02/2026
- * Autor: [TU NOMBRE AQUÍ]
- * Descripción:
- *   - Sanitizar username antes de mostrar en flash message (previene XSS)
- *   - Cumple punto 2 del PDF: sanitización por contexto (HTML output)
- * Reversión: Eliminar sanitización en línea del flash message si es necesario
- */ 
+
