@@ -370,15 +370,3 @@ class NoteController {
     }
 }
 ?>
-/**
- * === CAMBIO SEGURIDAD: IMPLEMENTACIÓN DE ROLES Y VALIDACIÓN DE PROPIEDAD (Punto 5 del PDF) ===
- * Fecha: 18/02/2026
- * Autor: [TU NOMBRE AQUÍ]
- * Descripción:
- *   - Agregado método isAdmin() para verificar rol de administrador
- *   - Agregado método isNoteOwner() para verificar propiedad de notas
- *   - Validación de propiedad en edit(), update(), delete(), archive() para prevenir IDOR
- *   - Mensajes de error genéricos para evitar enumeración de IDs
- *   - Cumple punto 5 del PDF: autenticación y autorización claras (roles/permisos)
- * Reversión: Eliminar métodos isAdmin()/isNoteOwner() y validaciones de propiedad si es necesario
- */
