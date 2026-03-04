@@ -17,7 +17,7 @@ class User {
     public $username;
     public $email;
     public $password;
-    public $role;
+    public $role;          // === NUEVO: campo role para autorización ===
     public $is_active;
     public $created_at;
     
@@ -47,7 +47,7 @@ class User {
         $stmt->bindParam(':username', $this->username);
         $stmt->bindParam(':email', $this->email);
         $stmt->bindParam(':password', $hashedPassword);
-        $stmt->bindValue(':role', 'user');
+        $stmt->bindValue(':role', 'user'); // === NUEVO: role por defecto 'user' ===
         
         if ($stmt->execute()) {
             $this->id = $this->conn->lastInsertId();
@@ -104,13 +104,13 @@ class User {
                     'id' => $row['id'],
                     'username' => $row['username'],
                     'email' => $row['email'],
-                    'role' => $row['role']
+                    'role' => $row['role'] // === NUEVO: devolver role para almacenar en sesión ===
                 ];
             } else {
                 // Incrementar intentos fallidos
                 $this->incrementFailedAttempts($row['id']);
                 
-                // login fallido
+                // Log de login fallido
                 $this->logSecurityEvent('LOGIN_FAILED', 'Contraseña incorrecta', $row['id']);
                 return false;
             }
@@ -129,7 +129,7 @@ class User {
     public function emailExists($email) {
         $query = "SELECT id FROM " . $this->table . " WHERE email = :email LIMIT 1";
         $stmt = $this->conn->prepare($query);
-        $->bindParam(':email', $email);
+        $stmt->bindParam(':email', $email);
         $stmt->execute();
         return $stmt->rowCount() > 0;
     }
@@ -206,7 +206,7 @@ class User {
         
         $stmt = $this->conn->prepare($query);
         
-       ip = Security::getClientIP();
+        $ip = Security::getClientIP();
         $userAgent = Security::getUserAgent();
         $severity = ($eventType === 'LOGIN_FAILED' || $eventType === 'ACCOUNT_LOCKED') ? 'MEDIUM' : 'LOW';
         
@@ -288,5 +288,3 @@ class User {
     }
 }
 ?>
-        
-       
