@@ -67,6 +67,10 @@ require_once __DIR__ . '/../../helpers/Security.php';
             </form>
             
             <p class="auth-footer">
+                <a href="index.php?page=forgot-password">¿Olvidaste tu contraseña?</a>
+            </p>
+            
+            <p class="auth-footer">
                 ¿No tienes cuenta? 
                 <a href="index.php?page=register">Regístrate aquí</a>
             </p>
