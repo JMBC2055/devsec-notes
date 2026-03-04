@@ -11,6 +11,7 @@ Session::start();
 // Cargar controladores
 require_once __DIR__ . '/../controllers/AuthController.php';
 require_once __DIR__ . '/../controllers/NoteController.php';
+require_once __DIR__ . '/../controllers/PasswordController.php'; // === NUEVO ===
 
 // Obtener página solicitada
 $page = $_GET['page'] ?? 'login';
@@ -42,6 +43,27 @@ switch ($page) {
     case 'logout':
         $controller = new AuthController();
         $controller->logout();
+        break;
+    
+    // ==================== RECUPERACIÓN DE CONTRASEÑA ====================
+    case 'forgot-password':
+        $controller = new PasswordController();
+        $controller->showForgotForm();
+        break;
+
+    case 'request-reset':
+        $controller = new PasswordController();
+        $controller->requestReset();
+        break;
+
+    case 'reset-password':
+        $controller = new PasswordController();
+        $controller->showResetForm();
+        break;
+
+    case 'reset-password-process':
+        $controller = new PasswordController();
+        $controller->resetPassword();
         break;
     
     // ==================== NOTAS ====================
