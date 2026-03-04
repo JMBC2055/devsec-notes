@@ -1,24 +1,54 @@
-<?php require_once __DIR__ . '/../layout/header.php'; ?>
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-            <h2>¿Olvidaste tu contraseña?</h2>
-            <?php if (Session::has('flash_error')): ?>
-                <div class="alert alert-danger"><?= Session::getFlash('error') ?></div>
+<?php
+// views/auth/forgot-password.php
+require_once __DIR__ . '/../../helpers/Security.php';
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recuperar contraseña - Gestor de Notas</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-box">
+            <h1>🔐 Recuperar contraseña</h1>
+            <p class="subtitle">Ingresa tu email para recibir un enlace de restablecimiento</p>
+
+            <?php if ($error = Session::getFlash('error')): ?>
+                <div class="alert alert-error"><?= htmlspecialchars($error) ?></div>
             <?php endif; ?>
-            <?php if (Session::has('flash_success')): ?>
-                <div class="alert alert-success"><?= Session::getFlash('success') ?></div>
+
+            <?php if ($success = Session::getFlash('success')): ?>
+                <div class="alert alert-success"><?= htmlspecialchars($success) ?></div>
             <?php endif; ?>
-            
-            <form method="POST" action="/devsec-notes/public/index.php?page=request-reset">
-                <div class="mb-3">
-                    <label for="email" class="form-label">Email</label>
-                    <input type="email" class="form-control" id="email" name="email" required>
+
+            <form action="index.php?page=request-reset" method="POST" class="auth-form">
+                <!-- CSRF -->
+                <input type="hidden" name="csrf_token" value="<?= Security::generateCSRFToken() ?>">
+
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input 
+                        type="email" 
+                        id="email" 
+                        name="email" 
+                        required 
+                        placeholder="tu@email.com"
+                        autofocus
+                    >
                 </div>
-                <button type="submit" class="btn btn-primary">Enviar enlace</button>
-                <a href="/devsec-notes/public/index.php?page=login" class="btn btn-link">Volver al login</a>
+
+                <button type="submit" class="btn btn-primary btn-block">
+                    Enviar enlace
+                </button>
             </form>
+
+            <p class="auth-footer">
+                <a href="index.php?page=login">Volver al inicio de sesión</a>
+            </p>
         </div>
     </div>
-</div>
-<?php require_once __DIR__ . '/../layout/footer.php'; ?>
+</body>
+</html>
