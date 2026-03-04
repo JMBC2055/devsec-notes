@@ -220,6 +220,71 @@ class User {
         $stmt->execute();
     }
 }
+    /**
+     * Generar token de recuperación
+     * @param string $email
+     * @return string|false
+     */
+    public function generateResetToken($email) {
+        if (!$this->emailExists($email)) {
+            return false;
+        }
+        
+        $token = bin2hex(random_bytes(32));
+        $expires = date('Y-m-d H:i:s', strtotime('+15 minutes'));
+        
+        $query = "UPDATE " . $this->table . " 
+                  SET reset_token = :token, reset_expires = :expires 
+                  WHERE email = :email";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':token', $token);
+        $stmt->bindParam(':expires', $expires);
+        $stmt->bindParam(':email', $email);
+        
+        if ($stmt->execute()) {
+            return $token;
+        }
+        return false;
+    }
+
+    /**
+     * Validar token de recuperación
+     * @param string $token
+     * @return array|false
+     */
+    public function validateResetToken($token) {
+        $query = "SELECT id, email, reset_expires FROM " . $this->table . " 
+                  WHERE reset_token = :token AND reset_expires > NOW()";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':token', $token);
+        $stmt->execute();
+        
+        if ($stmt->rowCount() > 0) {
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+        return false;
+    }
+
+    /**
+     * Restablecer contraseña
+     * @param int $userId
+     * @param string $newPassword
+     * @return bool
+     */
+    public function resetPassword($userId, $newPassword) {
+        $hashedPassword = Security::hashPassword($newPassword);
+        
+        $query = "UPDATE " . $this->table . " 
+                  SET password = :password, reset_token = NULL, reset_expires = NULL 
+                  WHERE id = :id";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':password', $hashedPassword);
+        $stmt->bindParam(':id', $userId);
+        
+        return $stmt->execute();
+    }
 ?>
 
- */
