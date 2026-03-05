@@ -109,6 +109,72 @@ class Validator {
         return $this;
     }
     
+    // ============================================================================
+    // === CAMBIO PUNTO 2: VALIDACIÓN DE ENTRADAS (Backend) ===
+    // Fecha: 18/02/2026
+    // Autor: [TU NOMBRE AQUÍ]
+    // Descripción:
+    //   - Se agregan métodos: integer(), date(), cleanText()
+    //   - Se corrige error en getFirstError(): $this::errors → $this->errors
+    //   - Estos métodos validan tipo, formato y contenido limpio antes de procesar
+    // Reversión: Eliminar esta sección y la corrección en getFirstError() si es necesario
+    // ============================================================================
+    
+    /**
+     * Validar que el valor sea un número entero
+     * @param mixed $value
+     * @param string $fieldName
+     * @return self
+     */
+    public function integer($value, $fieldName = 'Campo') {
+        if (!is_numeric($value) || intval($value) != $value) {
+            $this->errors[$fieldName] = "$fieldName debe ser un número entero";
+        }
+        return $this;
+    }
+
+    /**
+     * Validar formato de fecha
+     * @param string $value
+     * @param string $format Ej: 'Y-m-d', 'd/m/Y'
+     * @param string $fieldName
+     * @return self
+     */
+    public function date($value, $format = 'Y-m-d', $fieldName = 'Fecha') {
+        $d = DateTime::createFromFormat($format, $value);
+        if (!$d || $d->format($format) !== $value) {
+            $this->errors[$fieldName] = "$fieldName no tiene el formato '$format'";
+        }
+        return $this;
+    }
+
+    /**
+     * Validar texto limpio (sin HTML, sin caracteres peligrosos)
+     * @param string $value
+     * @param string $fieldName
+     * @return self
+     */
+    public function cleanText($value, $fieldName = 'Texto') {
+        // Sanitización básica
+        $sanitized = trim($value);
+        $sanitized = stripslashes($sanitized);
+        $sanitized = htmlspecialchars($sanitized, ENT_QUOTES, 'UTF-8');
+        
+        // Verificar que no haya tags HTML residuales
+        if (preg_match('/<[^>]+>/', $sanitized)) {
+            $this->errors[$fieldName] = "$fieldName contiene contenido no permitido (HTML detectado)";
+            return $this;
+        }
+
+        // Verificar longitud razonable (evitar payloads grandes)
+        if (strlen($sanitized) > 5000) {
+            $this->errors[$fieldName] = "$fieldName es demasiado largo (máx. 5000 caracteres)";
+            return $this;
+        }
+
+        return $this;
+    }
+    
     /**
      * Verificar si hay errores
      * @return bool
@@ -130,6 +196,7 @@ class Validator {
      * @return string|null
      */
     public function getFirstError() {
+        // CORRECCIÓN 18/02/2026: $this::errors → $this->errors (evita Fatal Error)
         return !empty($this->errors) ? reset($this->errors) : null;
     }
 }
