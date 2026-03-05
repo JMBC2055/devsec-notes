@@ -1,0 +1,17 @@
+{
+    "name": "jorge/gestor-notas-seguro",
+    "description": "Gestor de Notas con enfoque DevSecOps",
+    "type": "project",
+    "require": {
+        "php": ">=7.4",
+        "phpmailer/phpmailer": "^6.9"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}

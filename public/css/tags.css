@@ -1,0 +1,138 @@
+/* ============================================================================
+   AGREGAR AL FINAL de: public/css/style.css
+   DESCRIPCIÓN: Estilos para el sistema de etiquetas (tags)
+   ============================================================================ */
+
+/* ==================== BADGES DE TAGS ==================== */
+.tag-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+.note-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 0.4rem 0;
+}
+
+/* ==================== SELECTOR DE TAGS EN FORMULARIO ==================== */
+.tags-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 0.6rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-color);
+    min-height: 44px;
+}
+
+.tags-selector label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: normal;
+}
+
+.tags-selector input[type="checkbox"] {
+    accent-color: var(--primary-color);
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+}
+
+.tags-selector-empty {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-style: italic;
+}
+
+/* ==================== FILTRO DE TAGS EN DASHBOARD ==================== */
+.tags-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 1.2rem;
+    align-items: center;
+}
+
+.tags-filter-bar span {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.tag-filter-btn {
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 999px;
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: opacity 0.15s;
+    border: 2px solid transparent;
+}
+
+.tag-filter-btn:hover {
+    opacity: 0.85;
+}
+
+.tag-filter-btn.active {
+    border-color: var(--text-color);
+}
+
+.tag-filter-all {
+    background: var(--secondary-color);
+}
+
+/* ==================== GESTIÓN DE TAGS ==================== */
+.tags-manage-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 700px;
+}
+
+.tag-manage-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    box-shadow: var(--shadow);
+}
+
+.tag-manage-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.tag-manage-right {
+    display: flex;
+    gap: 8px;
+}
+
+/* ==================== ENLACE EN EL HEADER ==================== */
+.btn-tags {
+    background: transparent;
+    color: var(--primary-color);
+    border: 1px solid var(--primary-color);
+}
+
+.btn-tags:hover {
+    background: var(--primary-color);
+    color: #fff;
+}
