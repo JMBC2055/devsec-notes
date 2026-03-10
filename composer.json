@@ -3,7 +3,7 @@
     "description": "Gestor de Notas con enfoque DevSecOps",
     "type": "project",
     "require": {
-        "php": ">=7.4",
+        "php": ">=8.0",
         "phpmailer/phpmailer": "^6.9"
     },
     "autoload": {
