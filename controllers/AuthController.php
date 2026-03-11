@@ -2,7 +2,7 @@
 // ============================================================================
 // UBICACIÓN: gestor-notas/controllers/AuthController.php
 // DESCRIPCIÓN: Controlador de autenticación + Recuperación de contraseña
-//              CORREGIDO: Errores de headers already sent y sesiones
+// VERSIÓN: 3.0 - CORREGIDO para Railway con soporte multi-puerto
 // ============================================================================
 
 require_once __DIR__ . '/../models/User.php';
@@ -13,6 +13,7 @@ require_once __DIR__ . '/../helpers/Validator.php';
 
 // PHPMailer (instalado con Composer)
 use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
 
 class AuthController {
@@ -281,13 +282,12 @@ class AuthController {
     }
 
     // =========================================================================
-    // EMAIL CON PHPMAILER + BREVO SMTP
+    // EMAIL CON PHPMAILER + BREVO SMTP - VERSIÓN CORREGIDA
     // =========================================================================
 
     /**
      * Enviar email de recuperación usando PHPMailer + Brevo
-     * Variables de entorno necesarias en Railway:
-     *   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM, APP_URL
+     * Soporta auto-detección de puerto (587/TLS o 465/SSL)
      */
     private function sendResetEmail($email, $username, $token) {
         // Autoload de Composer (PHPMailer)
@@ -298,63 +298,165 @@ class AuthController {
         }
         require_once $autoload;
 
-        // URL base de la app (en Railway la configuras como variable APP_URL)
+        // Obtener configuración de variables de entorno
+        $smtpHost = getenv('SMTP_HOST') ?: 'smtp-relay.brevo.com';
+        $smtpPort = (int)(getenv('SMTP_PORT') ?: 587);
+        $smtpUser = getenv('SMTP_USER') ?: '';
+        $smtpPass = getenv('SMTP_PASS') ?: '';
+        $smtpFrom = getenv('SMTP_FROM') ?: ($smtpUser ?: 'noreply@gestor.local');
+        
+        // URL base de la app
         $appUrl    = rtrim(getenv('APP_URL') ?: 'http://localhost/gestor-notas/public', '/');
         $resetLink = $appUrl . '/index.php?page=reset-password&token=' . urlencode($token);
 
+        // Determinar encriptación según el puerto
+        $encryption = PHPMailer::ENCRYPTION_STARTTLS; // TLS para puerto 587
+        if ($smtpPort == 465) {
+            $encryption = PHPMailer::ENCRYPTION_SMTPS; // SSL para puerto 465
+        }
+
+        // Log para depuración
+        error_log("[EMAIL_DEBUG] Configuración: Host=$smtpHost, Port=$smtpPort, User=$smtpUser, Encryption=" . ($encryption == PHPMailer::ENCRYPTION_SMTPS ? 'SSL' : 'TLS'));
+
         try {
             $mail = new PHPMailer(true);
-
-            // Configuración SMTP desde variables de entorno
+            
+            // Configuración SMTP
             $mail->isSMTP();
-            $mail->Host       = getenv('SMTP_HOST') ?: 'smtp-relay.brevo.com';
+            $mail->Host       = $smtpHost;
             $mail->SMTPAuth   = true;
-            $mail->Username   = getenv('SMTP_USER') ?: '';
-            $mail->Password   = getenv('SMTP_PASS') ?: '';
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-            $mail->Port       = (int)(getenv('SMTP_PORT') ?: 465);
+            $mail->Username   = $smtpUser;
+            $mail->Password   = $smtpPass;
+            $mail->SMTPSecure = $encryption;
+            $mail->Port       = $smtpPort;
             $mail->CharSet    = 'UTF-8';
+            
+            // Timeout más largo para Railway
+            $mail->Timeout = 30;
+            $mail->SMTPKeepAlive = true;
+            
+            // Opciones SSL (importante para Railway)
+            $mail->SMTPOptions = [
+                'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false,
+                    'allow_self_signed' => true
+                ]
+            ];
 
             // Remitente y destinatario
-            $fromEmail = getenv('SMTP_FROM') ?: (getenv('SMTP_USER') ?: 'noreply@gestor.local');
-            $mail->setFrom($fromEmail, 'Gestor de Notas Seguro');
+            $mail->setFrom($smtpFrom, 'Gestor de Notas Seguro');
             $mail->addAddress($email, $username);
+            $mail->addReplyTo($smtpFrom, 'Gestor de Notas Seguro');
 
             // Contenido del email
             $mail->isHTML(true);
             $mail->Subject = 'Recuperación de contraseña - Gestor de Notas';
-            $mail->Body    = "
-                <div style='font-family:Arial,sans-serif;max-width:500px;margin:auto;padding:24px;'>
-                    <h2 style='color:#1a1a2e;'>🔑 Recuperar contraseña</h2>
-                    <p>Hola <strong>{$username}</strong>,</p>
-                    <p>Recibimos una solicitud para restablecer tu contraseña.</p>
-                    <p style='margin:24px 0;'>
-                        <a href='{$resetLink}'
-                           style='background:#4f46e5;color:#fff;padding:12px 24px;
-                                  border-radius:6px;text-decoration:none;font-weight:bold;'>
-                            Restablecer contraseña
-                        </a>
-                    </p>
-                    <p style='color:#666;font-size:0.9em;'>
-                        Este enlace es válido por <strong>30 minutos</strong>.<br>
-                        Si no solicitaste esto, ignora este email.
-                    </p>
-                    <hr style='border:none;border-top:1px solid #eee;margin:24px 0;'>
-                    <p style='color:#999;font-size:0.8em;'>
-                        O copia y pega este enlace en tu navegador:<br>
-                        <small>{$resetLink}</small>
-                    </p>
-                </div>
-            ";
-            $mail->AltBody = "Hola $username,\n\nEnlace para restablecer tu contraseña (válido 30 minutos):\n$resetLink\n\nSi no solicitaste esto, ignora este email.";
+            
+            // Cuerpo HTML mejorado
+            $mail->Body    = $this->getEmailTemplate($username, $resetLink);
+            
+            // Versión texto plano
+            $mail->AltBody = "Hola $username,\n\n" .
+                "Has solicitado restablecer tu contraseña.\n\n" .
+                "Haz clic en este enlace (válido por 30 minutos):\n" .
+                "$resetLink\n\n" .
+                "Si no solicitaste esto, ignora este mensaje.\n\n" .
+                "Saludos,\nEl equipo de Gestor de Notas Seguro";
 
             $mail->send();
+            error_log("[EMAIL_SUCCESS] Correo enviado a: $email");
             return true;
 
         } catch (Exception $e) {
-            error_log("[EMAIL_ERROR] No se pudo enviar a $email: " . $e->getMessage());
+            $errorMsg = $mail->ErrorInfo ?: $e->getMessage();
+            error_log("[EMAIL_ERROR] No se pudo enviar a $email: " . $errorMsg);
+            error_log("[EMAIL_DEBUG] Host: $smtpHost, Puerto: $smtpPort");
             return false;
         }
+    }
+
+    /**
+     * Template HTML para email de recuperación
+     */
+    private function getEmailTemplate($username, $resetLink) {
+        return '
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin:0; padding:0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f7;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f7; padding: 20px;">
+                <tr>
+                    <td align="center">
+                        <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                            <!-- Header -->
+                            <tr>
+                                <td style="padding: 30px 30px 20px 30px; text-align: center; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 8px 8px 0 0;">
+                                    <h1 style="color: #ffffff; margin: 0; font-size: 24px;">🔐 Recuperación de Contraseña</h1>
+                                </td>
+                            </tr>
+                            
+                            <!-- Content -->
+                            <tr>
+                                <td style="padding: 30px;">
+                                    <p style="font-size: 16px; color: #374151; margin: 0 0 15px 0;">Hola <strong style="color: #4f46e5;">' . htmlspecialchars($username) . '</strong>,</p>
+                                    
+                                    <p style="font-size: 16px; color: #374151; margin: 0 0 20px 0;">Hemos recibido una solicitud para restablecer la contraseña de tu cuenta en <strong>Gestor de Notas Seguro</strong>.</p>
+                                    
+                                    <p style="font-size: 16px; color: #374151; margin: 0 0 25px 0;">Haz clic en el siguiente botón para continuar:</p>
+                                    
+                                    <!-- Button -->
+                                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                        <tr>
+                                            <td align="center" style="padding: 10px 0 30px 0;">
+                                                <a href="' . $resetLink . '" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #ffffff; padding: 14px 34px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">Restablecer Contraseña</a>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                    
+                                    <!-- Divider -->
+                                    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+                                    
+                                    <!-- Info -->
+                                    <p style="font-size: 14px; color: #6b7280; margin: 20px 0 10px 0;">
+                                        ⏰ Este enlace expirará en <strong>30 minutos</strong> por seguridad.
+                                    </p>
+                                    
+                                    <p style="font-size: 14px; color: #6b7280; margin: 10px 0 20px 0;">
+                                        Si el botón no funciona, copia y pega este enlace en tu navegador:
+                                    </p>
+                                    
+                                    <p style="background-color: #f3f4f6; padding: 12px; border-radius: 4px; font-size: 12px; color: #1f2937; word-break: break-all; margin: 0;">
+                                        ' . $resetLink . '
+                                    </p>
+                                    
+                                    <p style="font-size: 14px; color: #6b7280; margin: 25px 0 0 0;">
+                                        Si no solicitaste este cambio, puedes ignorar este mensaje. Tu cuenta está segura.
+                                    </p>
+                                </td>
+                            </tr>
+                            
+                            <!-- Footer -->
+                            <tr>
+                                <td style="padding: 20px 30px; text-align: center; background-color: #f9fafb; border-radius: 0 0 8px 8px; border-top: 1px solid #e5e7eb;">
+                                    <p style="font-size: 14px; color: #9ca3af; margin: 0;">
+                                        &copy; ' . date('Y') . ' Gestor de Notas Seguro. Todos los derechos reservados.
+                                    </p>
+                                    <p style="font-size: 12px; color: #9ca3af; margin: 10px 0 0 0;">
+                                        Este es un mensaje automático, por favor no respondas a este correo.
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        ';
     }
 }
 ?>
