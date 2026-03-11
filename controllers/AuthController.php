@@ -2,7 +2,7 @@
 // ============================================================================
 // UBICACIÓN: gestor-notas/controllers/AuthController.php
 // DESCRIPCIÓN: Controlador de autenticación + Recuperación de contraseña
-// VERSIÓN: 4.2 - CORREGIDO DEFINITIVO para Resend v0.1.0 con HttpTransporter
+// VERSIÓN: 4.3 - CORREGIDO para Resend SDK (uso correcto de \Resend::client)
 // ============================================================================
 
 require_once __DIR__ . '/../models/User.php';
@@ -10,8 +10,6 @@ require_once __DIR__ . '/../models/PasswordReset.php';
 require_once __DIR__ . '/../helpers/Session.php';
 require_once __DIR__ . '/../helpers/Security.php';
 require_once __DIR__ . '/../helpers/Validator.php';
-
-// Resend PHP SDK - No necesitas "use" para esta versión
 
 class AuthController {
 
@@ -264,11 +262,11 @@ class AuthController {
     }
 
     // =========================================================================
-    // EMAIL CON RESEND API - VERSIÓN DEFINITIVA CORREGIDA
+    // EMAIL CON RESEND API - VERSIÓN CORREGIDA
     // =========================================================================
 
     /**
-     * Enviar email de recuperación usando Resend API - VERSIÓN CORREGIDA DEFINITIVA
+     * Enviar email de recuperación usando Resend SDK
      */
     private function sendResetEmail($email, $username, $token) {
         // Verificar que el autoload existe
@@ -287,35 +285,27 @@ class AuthController {
         }
 
         // Construir enlace de recuperación
-        $appUrl = rtrim(getenv('APP_URL') ?: 'http://localhost/gestor-notas/public', '/');
+        $appUrl    = rtrim(getenv('APP_URL') ?: 'http://localhost/gestor-notas/public', '/');
         $resetLink = $appUrl . '/index.php?page=reset-password&token=' . urlencode($token);
 
         error_log("[EMAIL_DEBUG] Intentando enviar con Resend a: $email");
 
         try {
-            // 🔴 CORRECCIÓN DEFINITIVA: Usar HttpTransporter con la API Key
-            // Crear el transporter con la API key
-            $transporter = new \Resend\Transporter\HttpTransporter(
-                \Resend\ValueObjects\ApiKey::from($apiKey),
-                new \GuzzleHttp\Client()
-            );
-            
-            // Inicializar el cliente de Resend con el transporter
-            $resend = new \Resend\Client($transporter);
-            
-            // Enviar el email usando la API
+            // ✅ CORRECTO: Usar la facade estática del SDK
+            $resend = \Resend::client($apiKey);
+
             $result = $resend->emails->send([
-                'from' => 'Gestor de Notas <onboarding@resend.dev>',
-                'to' => [$email],
+                'from'    => 'Gestor de Notas <onboarding@resend.dev>',
+                'to'      => [$email],
                 'subject' => 'Recuperación de contraseña - Gestor de Notas',
-                'html' => $this->getEmailTemplate($username, $resetLink),
-                'text' => "Hola $username,\n\nEnlace para restablecer tu contraseña (válido 30 minutos):\n$resetLink\n\nSi no solicitaste esto, ignora este email."
+                'html'    => $this->getEmailTemplate($username, $resetLink),
+                'text'    => "Hola $username,\n\nEnlace para restablecer tu contraseña (válido 30 minutos):\n$resetLink\n\nSi no solicitaste esto, ignora este email."
             ]);
 
             error_log("[EMAIL_SUCCESS] Correo enviado a: $email - ID: " . ($result->id ?? 'desconocido'));
             return true;
 
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             error_log("[EMAIL_ERROR] Excepción de Resend: " . $e->getMessage());
             return false;
         }
