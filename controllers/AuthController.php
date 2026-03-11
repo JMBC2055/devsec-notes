@@ -312,7 +312,7 @@ class AuthController {
             $mail->Username   = getenv('SMTP_USER') ?: '';
             $mail->Password   = getenv('SMTP_PASS') ?: '';
             $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-            $mail->Port       = (int)(getenv('SMTP_PORT') ?: 465);
+            $mail->Port       = (int)(getenv('SMTP_PORT') ?: 587);
             $mail->CharSet    = 'UTF-8';
 
             // Remitente y destinatario

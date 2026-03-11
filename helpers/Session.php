@@ -2,6 +2,7 @@
 // ============================================================================
 // UBICACIÓN: /app/helpers/Session.php (o la ruta correspondiente)
 // DESCRIPCIÓN: Manejo seguro de sesiones - CORREGIDO para Railway
+// VERSIÓN: 2.0 - Compatible con Railway
 // ============================================================================
 
 class Session {
@@ -19,6 +20,62 @@ class Session {
     }
     
     /**
+     * Detectar si estamos en entorno Railway
+     * @return bool
+     */
+    private static function isRailway() {
+        return getenv('RAILWAY_ENVIRONMENT') !== false || 
+               getenv('RAILWAY_SERVICE_NAME') !== false ||
+               (isset($_SERVER['HTTP_X_FORWARDED_FOR']) && !empty($_SERVER['HTTP_X_FORWARDED_FOR']));
+    }
+    
+    /**
+     * Verificar si la IP está en el rango de Railway
+     * @param string $ip
+     * @return bool
+     */
+    private static function isRailwayIP($ip) {
+        // Rango de Railway: 100.64.0.0/10
+        if (strpos($ip, '100.64.') === 0 || strpos($ip, '100.65.') === 0 || 
+            strpos($ip, '100.66.') === 0 || strpos($ip, '100.67.') === 0 ||
+            strpos($ip, '100.68.') === 0 || strpos($ip, '100.69.') === 0 ||
+            strpos($ip, '100.70.') === 0 || strpos($ip, '100.71.') === 0 ||
+            strpos($ip, '100.72.') === 0 || strpos($ip, '100.73.') === 0 ||
+            strpos($ip, '100.74.') === 0 || strpos($ip, '100.75.') === 0 ||
+            strpos($ip, '100.76.') === 0 || strpos($ip, '100.77.') === 0 ||
+            strpos($ip, '100.78.') === 0 || strpos($ip, '100.79.') === 0 ||
+            strpos($ip, '100.80.') === 0 || strpos($ip, '100.81.') === 0 ||
+            strpos($ip, '100.82.') === 0 || strpos($ip, '100.83.') === 0 ||
+            strpos($ip, '100.84.') === 0 || strpos($ip, '100.85.') === 0 ||
+            strpos($ip, '100.86.') === 0 || strpos($ip, '100.87.') === 0 ||
+            strpos($ip, '100.88.') === 0 || strpos($ip, '100.89.') === 0 ||
+            strpos($ip, '100.90.') === 0 || strpos($ip, '100.91.') === 0 ||
+            strpos($ip, '100.92.') === 0 || strpos($ip, '100.93.') === 0 ||
+            strpos($ip, '100.94.') === 0 || strpos($ip, '100.95.') === 0 ||
+            strpos($ip, '100.96.') === 0 || strpos($ip, '100.97.') === 0 ||
+            strpos($ip, '100.98.') === 0 || strpos($ip, '100.99.') === 0 ||
+            strpos($ip, '100.100.') === 0 || strpos($ip, '100.101.') === 0 ||
+            strpos($ip, '100.102.') === 0 || strpos($ip, '100.103.') === 0 ||
+            strpos($ip, '100.104.') === 0 || strpos($ip, '100.105.') === 0 ||
+            strpos($ip, '100.106.') === 0 || strpos($ip, '100.107.') === 0 ||
+            strpos($ip, '100.108.') === 0 || strpos($ip, '100.109.') === 0 ||
+            strpos($ip, '100.110.') === 0 || strpos($ip, '100.111.') === 0 ||
+            strpos($ip, '100.112.') === 0 || strpos($ip, '100.113.') === 0 ||
+            strpos($ip, '100.114.') === 0 || strpos($ip, '100.115.') === 0 ||
+            strpos($ip, '100.116.') === 0 || strpos($ip, '100.117.') === 0 ||
+            strpos($ip, '100.118.') === 0 || strpos($ip, '100.119.') === 0 ||
+            strpos($ipmessage: , '100.120.') === 0 || strpos($ip, '100.121.') === 0 ||
+            strpos($ip, '100.122.') === 0 || strpos($ip, '100.123.') === 0 ||
+            strpos($ip, '100.124.') === 0 || strpos($ip, '100.125.') === 0 ||
+            strpos($ip, '100.126.') === 0 || strpos($ip, '100.127.') === 0) {
+            return true;
+        }
+        
+        // También permitir IPs locales y de desarrollo
+        return in_array($ip, ['127.0.0.1', '::1', 'localhost']);
+    }
+    
+    /**
      * Iniciar sesión segura - VERSIÓN CORREGIDA sin headers issues
      * @throws Exception
      */
@@ -32,7 +89,7 @@ class Session {
         // Intentar iniciar sesión solo si no se han enviado headers
         if (self::canSendHeaders()) {
             
-            // === CONFIGURACIÓN SEGURA DE SESIÓN (Punto 6 del PDF) ===
+            // === CONFIGURACIÓN SEGURA DE SESIÓN ===
             // HttpOnly: impide acceso desde JavaScript (XSS)
             ini_set('session.cookie_httponly', 1);
             
@@ -96,6 +153,24 @@ class Session {
     }
     
     /**
+     * Generar fingerprint único basado en IP + User-Agent + Accept-Language
+     * @return string
+     */
+    private static function generateFingerprint() {
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $ua = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
+        $acceptLang = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '';
+        
+        // En Railway, la IP puede ser proxy, usar X-Forwarded-For si existe
+        if (self::isRailway() && isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $forwardedIps = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+            $ip = trim($forwardedIps[0]); // Primera IP es la real del cliente
+        }
+        
+        return hash('sha256', $ip . $ua . $acceptLang);
+    }
+    
+    /**
      * Validar sesión existente (timeouts y fingerprint)
      * @throws Exception
      */
@@ -118,11 +193,38 @@ class Session {
             throw new Exception("Sesión expirada (tiempo máximo alcanzado)");
         }
         
-        // Verificar fingerprint (detectar session hijacking)
-        if (isset($_SESSION['session_fingerprint']) && 
-            self::generateFingerprint() !== $_SESSION['session_fingerprint']) {
-            self::destroy();
-            throw new Exception("Posible secuestro de sesión detectado");
+        // ===== VERIFICACIÓN DE FINGERPRINT CORREGIDA PARA RAILWAY =====
+        if (isset($_SESSION['session_fingerprint'])) {
+            $currentFingerprint = self::generateFingerprint();
+            
+            // Si estamos en Railway y el fingerprint no coincide, verificar si es por cambio de IP
+            if (self::isRailway() && $currentFingerprint !== $_SESSION['session_fingerprint']) {
+                // En Railway, permitimos cambios de IP dentro del mismo rango
+                $oldIp = $_SESSION['original_ip'] ?? null;
+                $currentIp = $_SERVER['REMOTE_ADDR'] ?? '';
+                
+                // Si no tenemos la IP original guardada, la guardamos
+                if (!isset($_SESSION['original_ip'])) {
+                    $_SESSION['original_ip'] = $currentIp;
+                    $_SESSION['session_fingerprint'] = $currentFingerprint;
+                }
+                // Si la IP actual está en rango de Railway, permitimos el acceso
+                else if (self::isRailwayIP($currentIp)) {
+                    // Actualizamos el fingerprint pero mantenemos la sesión
+                    error_log("Session: IP cambiada en Railway de " . ($_SESSION['original_ip'] ?? 'unknown') . " a $currentIp - Permitido");
+                    $_SESSION['session_fingerprint'] = $currentFingerprint;
+                }
+                // Si no es Railway IP, entonces sí es posible hijacking
+                else {
+                    self::destroy();
+                    throw new Exception("Posible secuestro de sesión detectado");
+                }
+            }
+            // Si no estamos en Railway, validación estricta normal
+            else if (!self::isRailway() && $currentFingerprint !== $_SESSION['session_fingerprint']) {
+                self::destroy();
+                throw new Exception("Posible secuestro de sesión detectado");
+            }
         }
         
         // Regenerar ID periódicamente (cada 15 minutos) - solo si podemos enviar headers
@@ -133,17 +235,6 @@ class Session {
         
         // Actualizar última actividad
         $_SESSION['last_activity'] = time();
-    }
-    
-    /**
-     * Generar fingerprint único basado en IP + User-Agent + Accept-Language
-     * @return string
-     */
-    private static function generateFingerprint() {
-        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-        $ua = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
-        $acceptLang = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '';
-        return hash('sha256', $ip . $ua . $acceptLang);
     }
     
     /**
@@ -202,7 +293,6 @@ class Session {
     
     /**
      * Destruir sesión completamente - VERSIÓN CORREGIDA
-     * Delega en Security::destroySession() para manejo seguro
      */
     public static function destroy() {
         // Primero limpiar variable local
@@ -338,21 +428,14 @@ class Session {
     }
     
     // ============================================================================
-    // === CAMBIO PUNTO 6: GESTIÓN SEGURA DE SESIONES ===
-    // Fecha: 18/02/2026
-    // Autor: [TU NOMBRE AQUÍ]
-    // Descripción:
-    //   - Timeout por inactividad (30 min) y absoluto (24h)
-    //   - Regeneración periódica de ID (cada 15 min)
-    //   - Fingerprint de sesión (IP + User-Agent) para detectar hijacking
-    //   - session.use_strict_mode = 1 activado
-    //   - Secure flag dinámico (1 en HTTPS, 0 en HTTP local)
-    //   - Destrucción segura de cookies al cerrar sesión
-    //   - CORREGIDO: Manejo de headers already sent
-    //   - CORREGIDO: Flash messages como array
-    //   - NUEVO: getAllFlashes() para vistas
-    //   - NUEVO: getRemainingTime() para mostrar expiración
-    // Reversión: Eliminar métodos nuevos y este bloque si es necesario
+    // === CAMBIO: VERSIÓN COMPATIBLE CON RAILWAY ===
+    // Fecha: 11/03/2026
+    // Cambios realizados:
+    //   - Agregada detección de entorno Railway
+    //   - Validación flexible de IP en Railway (permite rango 100.64.0.0/10)
+    //   - Manejo de X-Forwarded-For para IP real del cliente
+    //   - No lanza error de hijacking por cambios de IP en Railway
+    //   - Guarda IP original para tracking
     // ============================================================================
 }
 ?>
