@@ -2,7 +2,7 @@
 // ============================================================================
 // UBICACIÓN: gestor-notas/controllers/AuthController.php
 // DESCRIPCIÓN: Controlador de autenticación + Recuperación de contraseña
-// VERSIÓN: 3.0 - CORREGIDO para Railway con soporte multi-puerto
+// VERSIÓN: 4.0 - CORREGIDO para usar Resend API
 // ============================================================================
 
 require_once __DIR__ . '/../models/User.php';
@@ -11,10 +11,8 @@ require_once __DIR__ . '/../helpers/Session.php';
 require_once __DIR__ . '/../helpers/Security.php';
 require_once __DIR__ . '/../helpers/Validator.php';
 
-// PHPMailer (instalado con Composer)
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\SMTP;
-use PHPMailer\PHPMailer\Exception;
+// Resend PHP SDK
+use Resend\Client as ResendClient;
 
 class AuthController {
 
@@ -27,26 +25,20 @@ class AuthController {
 
     /**
      * Redireccionar de forma segura (evita headers already sent)
-     * @param string $url
-     * @param int $statusCode
      */
     private function safeRedirect($url, $statusCode = 302) {
-        // Verificar si ya se enviaron headers
         if (!headers_sent()) {
             header("Location: " . $url, true, $statusCode);
             exit();
         } else {
-            // Si ya se enviaron headers, usar JavaScript como fallback
             echo "<script>window.location.href='" . addslashes($url) . "';</script>";
-            echo "<noscript>";
-            echo "<meta http-equiv='refresh' content='0;url=" . addslashes($url) . "'>";
-            echo "</noscript>";
+            echo "<noscript><meta http-equiv='refresh' content='0;url=" . addslashes($url) . "'></noscript>";
             exit();
         }
     }
 
     // =========================================================================
-    // REGISTRO
+    // REGISTRO (sin cambios - igual que antes)
     // =========================================================================
 
     public function showRegister() {
@@ -110,7 +102,7 @@ class AuthController {
     }
 
     // =========================================================================
-    // LOGIN / LOGOUT
+    // LOGIN / LOGOUT (sin cambios - igual que antes)
     // =========================================================================
 
     public function showLogin() {
@@ -149,18 +141,11 @@ class AuthController {
         $userData       = $user->login();
 
         if ($userData) {
-            // Regenerar sesión de forma segura
             Security::regenerateSession(true);
-            
-            // Establecer datos de sesión
             Session::set('user_id',  $userData['id']);
             Session::set('username', $userData['username']);
             Session::set('email',    $userData['email']);
-            
-            // Mensaje flash
             Session::setFlash('success', '¡Bienvenido, ' . $userData['username'] . '!');
-            
-            // Redireccionar
             $this->safeRedirect('index.php?page=dashboard');
         } else {
             Session::setFlash('error', 'Credenciales incorrectas o cuenta bloqueada');
@@ -169,13 +154,12 @@ class AuthController {
     }
 
     public function logout() {
-        // Destruir sesión de forma segura
         Security::destroySession();
         $this->safeRedirect('index.php?page=login');
     }
 
     // =========================================================================
-    // RECUPERACIÓN DE CONTRASEÑA
+    // RECUPERACIÓN DE CONTRASEÑA (con cambios menores)
     // =========================================================================
 
     public function showForgotPassword() {
@@ -218,7 +202,6 @@ class AuthController {
             }
         }
 
-        // Mensaje genérico — no revela si el email existe
         Session::setFlash('success', 'Si el email está registrado, recibirás un enlace en breve. Revisa también tu carpeta de spam.');
         $this->safeRedirect('index.php?page=forgot-password');
     }
@@ -282,102 +265,58 @@ class AuthController {
     }
 
     // =========================================================================
-    // EMAIL CON PHPMAILER + BREVO SMTP - VERSIÓN CORREGIDA
+    // NUEVO: EMAIL CON RESEND API (Reemplaza a PHPMailer)
     // =========================================================================
 
     /**
-     * Enviar email de recuperación usando PHPMailer + Brevo
-     * Soporta auto-detección de puerto (587/TLS o 465/SSL)
+     * Enviar email de recuperación usando Resend API
      */
     private function sendResetEmail($email, $username, $token) {
-        // Autoload de Composer (PHPMailer)
+        // Verificar que el autoload existe
         $autoload = __DIR__ . '/../vendor/autoload.php';
         if (!file_exists($autoload)) {
-            error_log("[EMAIL] vendor/autoload.php no encontrado. ¿Ejecutaste composer install?");
+            error_log("[EMAIL_ERROR] vendor/autoload.php no encontrado");
             return false;
         }
         require_once $autoload;
 
-        // Obtener configuración de variables de entorno
-        $smtpHost = getenv('SMTP_HOST') ?: 'smtp-relay.brevo.com';
-        $smtpPort = (int)(getenv('SMTP_PORT') ?: 587);
-        $smtpUser = getenv('SMTP_USER') ?: '';
-        $smtpPass = getenv('SMTP_PASS') ?: '';
-        $smtpFrom = getenv('SMTP_FROM') ?: ($smtpUser ?: 'noreply@gestor.local');
-        
-        // URL base de la app
-        $appUrl    = rtrim(getenv('APP_URL') ?: 'http://localhost/gestor-notas/public', '/');
-        $resetLink = $appUrl . '/index.php?page=reset-password&token=' . urlencode($token);
-
-        // Determinar encriptación según el puerto
-        $encryption = PHPMailer::ENCRYPTION_STARTTLS; // TLS para puerto 587
-        if ($smtpPort == 465) {
-            $encryption = PHPMailer::ENCRYPTION_SMTPS; // SSL para puerto 465
+        // Obtener API Key de las variables de entorno
+        $apiKey = getenv('RESEND_API_KEY');
+        if (!$apiKey) {
+            error_log("[EMAIL_ERROR] RESEND_API_KEY no configurada en Railway");
+            return false;
         }
 
-        // Log para depuración
-        error_log("[EMAIL_DEBUG] Configuración: Host=$smtpHost, Port=$smtpPort, User=$smtpUser, Encryption=" . ($encryption == PHPMailer::ENCRYPTION_SMTPS ? 'SSL' : 'TLS'));
+        // Construir enlace de recuperación
+        $appUrl = rtrim(getenv('APP_URL') ?: 'http://localhost/gestor-notas/public', '/');
+        $resetLink = $appUrl . '/index.php?page=reset-password&token=' . urlencode($token);
+
+        error_log("[EMAIL_DEBUG] Intentando enviar con Resend a: $email");
 
         try {
-            $mail = new PHPMailer(true);
-            
-            // Configuración SMTP
-            $mail->isSMTP();
-            $mail->Host       = $smtpHost;
-            $mail->SMTPAuth   = true;
-            $mail->Username   = $smtpUser;
-            $mail->Password   = $smtpPass;
-            $mail->SMTPSecure = $encryption;
-            $mail->Port       = $smtpPort;
-            $mail->CharSet    = 'UTF-8';
-            
-            // Timeout más largo para Railway
-            $mail->Timeout = 30;
-            $mail->SMTPKeepAlive = true;
-            
-            // Opciones SSL (importante para Railway)
-            $mail->SMTPOptions = [
-                'ssl' => [
-                    'verify_peer' => false,
-                    'verify_peer_name' => false,
-                    'allow_self_signed' => true
-                ]
-            ];
+            // Inicializar cliente de Resend
+            $resend = ResendClient::client($apiKey);
 
-            // Remitente y destinatario
-            $mail->setFrom($smtpFrom, 'Gestor de Notas Seguro');
-            $mail->addAddress($email, $username);
-            $mail->addReplyTo($smtpFrom, 'Gestor de Notas Seguro');
+            // Enviar el email usando la API [citation:1]
+            $result = $resend->emails->send([
+                'from' => 'Gestor de Notas <onboarding@resend.dev>', // Email temporal de Resend
+                'to' => [$email],
+                'subject' => 'Recuperación de contraseña - Gestor de Notas',
+                'html' => $this->getEmailTemplate($username, $resetLink),
+                'text' => "Hola $username,\n\nEnlace para restablecer tu contraseña (válido 30 minutos):\n$resetLink\n\nSi no solicitaste esto, ignora este email."
+            ]);
 
-            // Contenido del email
-            $mail->isHTML(true);
-            $mail->Subject = 'Recuperación de contraseña - Gestor de Notas';
-            
-            // Cuerpo HTML mejorado
-            $mail->Body    = $this->getEmailTemplate($username, $resetLink);
-            
-            // Versión texto plano
-            $mail->AltBody = "Hola $username,\n\n" .
-                "Has solicitado restablecer tu contraseña.\n\n" .
-                "Haz clic en este enlace (válido por 30 minutos):\n" .
-                "$resetLink\n\n" .
-                "Si no solicitaste esto, ignora este mensaje.\n\n" .
-                "Saludos,\nEl equipo de Gestor de Notas Seguro";
-
-            $mail->send();
-            error_log("[EMAIL_SUCCESS] Correo enviado a: $email");
+            error_log("[EMAIL_SUCCESS] Correo enviado a: $email - ID: " . ($result->id ?? 'desconocido'));
             return true;
 
         } catch (Exception $e) {
-            $errorMsg = $mail->ErrorInfo ?: $e->getMessage();
-            error_log("[EMAIL_ERROR] No se pudo enviar a $email: " . $errorMsg);
-            error_log("[EMAIL_DEBUG] Host: $smtpHost, Puerto: $smtpPort");
+            error_log("[EMAIL_ERROR] Excepción de Resend: " . $e->getMessage());
             return false;
         }
     }
 
     /**
-     * Template HTML para email de recuperación
+     * Template HTML para email de recuperación (igual que antes)
      */
     private function getEmailTemplate($username, $resetLink) {
         return '
