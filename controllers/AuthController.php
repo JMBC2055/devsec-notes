@@ -2,7 +2,7 @@
 // ============================================================================
 // UBICACIÓN: gestor-notas/controllers/AuthController.php
 // DESCRIPCIÓN: Controlador de autenticación + Recuperación de contraseña
-//              Email enviado con PHPMailer + Brevo SMTP (funciona en Railway)
+//              CORREGIDO: Errores de headers already sent y sesiones
 // ============================================================================
 
 require_once __DIR__ . '/../models/User.php';
@@ -17,28 +17,52 @@ use PHPMailer\PHPMailer\Exception;
 
 class AuthController {
 
+    /**
+     * Constructor - Verificar regeneración de sesión pendiente
+     */
+    public function __construct() {
+        Security::regenerateIfNeeded();
+    }
+
+    /**
+     * Redireccionar de forma segura (evita headers already sent)
+     * @param string $url
+     * @param int $statusCode
+     */
+    private function safeRedirect($url, $statusCode = 302) {
+        // Verificar si ya se enviaron headers
+        if (!headers_sent()) {
+            header("Location: " . $url, true, $statusCode);
+            exit();
+        } else {
+            // Si ya se enviaron headers, usar JavaScript como fallback
+            echo "<script>window.location.href='" . addslashes($url) . "';</script>";
+            echo "<noscript>";
+            echo "<meta http-equiv='refresh' content='0;url=" . addslashes($url) . "'>";
+            echo "</noscript>";
+            exit();
+        }
+    }
+
     // =========================================================================
     // REGISTRO
     // =========================================================================
 
     public function showRegister() {
         if (Session::isAuthenticated()) {
-            header('Location: index.php?page=dashboard');
-            exit;
+            $this->safeRedirect('index.php?page=dashboard');
         }
         require_once __DIR__ . '/../views/auth/register.php';
     }
 
     public function register() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: index.php?page=register');
-            exit;
+            $this->safeRedirect('index.php?page=register');
         }
 
         if (!Security::validateCSRFToken($_POST['csrf_token'] ?? '')) {
             Session::setFlash('error', 'Token de seguridad inválido');
-            header('Location: index.php?page=register');
-            exit;
+            $this->safeRedirect('index.php?page=register');
         }
 
         $username        = Security::sanitize($_POST['username'] ?? '');
@@ -58,20 +82,17 @@ class AuthController {
 
         if ($validator->fails()) {
             Session::setFlash('error', $validator->getFirstError());
-            header('Location: index.php?page=register');
-            exit;
+            $this->safeRedirect('index.php?page=register');
         }
 
         $user = new User();
         if ($user->emailExists($email)) {
             Session::setFlash('error', 'El email ya está registrado');
-            header('Location: index.php?page=register');
-            exit;
+            $this->safeRedirect('index.php?page=register');
         }
         if ($user->usernameExists($username)) {
             Session::setFlash('error', 'El nombre de usuario ya está en uso');
-            header('Location: index.php?page=register');
-            exit;
+            $this->safeRedirect('index.php?page=register');
         }
 
         $user->username = $username;
@@ -80,12 +101,11 @@ class AuthController {
 
         if ($user->register()) {
             Session::setFlash('success', '¡Registro exitoso! Ahora puedes iniciar sesión');
-            header('Location: index.php?page=login');
+            $this->safeRedirect('index.php?page=login');
         } else {
             Session::setFlash('error', 'Error al registrar usuario. Intenta de nuevo');
-            header('Location: index.php?page=register');
+            $this->safeRedirect('index.php?page=register');
         }
-        exit;
     }
 
     // =========================================================================
@@ -94,22 +114,19 @@ class AuthController {
 
     public function showLogin() {
         if (Session::isAuthenticated()) {
-            header('Location: index.php?page=dashboard');
-            exit;
+            $this->safeRedirect('index.php?page=dashboard');
         }
         require_once __DIR__ . '/../views/auth/login.php';
     }
 
     public function login() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: index.php?page=login');
-            exit;
+            $this->safeRedirect('index.php?page=login');
         }
 
         if (!Security::validateCSRFToken($_POST['csrf_token'] ?? '')) {
             Session::setFlash('error', 'Token de seguridad inválido');
-            header('Location: index.php?page=login');
-            exit;
+            $this->safeRedirect('index.php?page=login');
         }
 
         $email    = Security::sanitize($_POST['email'] ?? '');
@@ -122,8 +139,7 @@ class AuthController {
 
         if ($validator->fails()) {
             Session::setFlash('error', $validator->getFirstError());
-            header('Location: index.php?page=login');
-            exit;
+            $this->safeRedirect('index.php?page=login');
         }
 
         $user           = new User();
@@ -132,23 +148,29 @@ class AuthController {
         $userData       = $user->login();
 
         if ($userData) {
-            Security::regenerateSession();
+            // Regenerar sesión de forma segura
+            Security::regenerateSession(true);
+            
+            // Establecer datos de sesión
             Session::set('user_id',  $userData['id']);
             Session::set('username', $userData['username']);
             Session::set('email',    $userData['email']);
+            
+            // Mensaje flash
             Session::setFlash('success', '¡Bienvenido, ' . $userData['username'] . '!');
-            header('Location: index.php?page=dashboard');
+            
+            // Redireccionar
+            $this->safeRedirect('index.php?page=dashboard');
         } else {
             Session::setFlash('error', 'Credenciales incorrectas o cuenta bloqueada');
-            header('Location: index.php?page=login');
+            $this->safeRedirect('index.php?page=login');
         }
-        exit;
     }
 
     public function logout() {
-        Session::destroy();
-        header('Location: index.php?page=login');
-        exit;
+        // Destruir sesión de forma segura
+        Security::destroySession();
+        $this->safeRedirect('index.php?page=login');
     }
 
     // =========================================================================
@@ -157,22 +179,19 @@ class AuthController {
 
     public function showForgotPassword() {
         if (Session::isAuthenticated()) {
-            header('Location: index.php?page=dashboard');
-            exit;
+            $this->safeRedirect('index.php?page=dashboard');
         }
         require_once __DIR__ . '/../views/auth/forgot_password.php';
     }
 
     public function processForgotPassword() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: index.php?page=forgot-password');
-            exit;
+            $this->safeRedirect('index.php?page=forgot-password');
         }
 
         if (!Security::validateCSRFToken($_POST['csrf_token'] ?? '')) {
             Session::setFlash('error', 'Token de seguridad inválido');
-            header('Location: index.php?page=forgot-password');
-            exit;
+            $this->safeRedirect('index.php?page=forgot-password');
         }
 
         $email = Security::sanitize($_POST['email'] ?? '');
@@ -182,8 +201,7 @@ class AuthController {
 
         if ($validator->fails()) {
             Session::setFlash('error', $validator->getFirstError());
-            header('Location: index.php?page=forgot-password');
-            exit;
+            $this->safeRedirect('index.php?page=forgot-password');
         }
 
         $passwordReset = new PasswordReset();
@@ -201,8 +219,7 @@ class AuthController {
 
         // Mensaje genérico — no revela si el email existe
         Session::setFlash('success', 'Si el email está registrado, recibirás un enlace en breve. Revisa también tu carpeta de spam.');
-        header('Location: index.php?page=forgot-password');
-        exit;
+        $this->safeRedirect('index.php?page=forgot-password');
     }
 
     public function showResetPassword() {
@@ -210,8 +227,7 @@ class AuthController {
 
         if (empty($token)) {
             Session::setFlash('error', 'Token inválido');
-            header('Location: index.php?page=forgot-password');
-            exit;
+            $this->safeRedirect('index.php?page=forgot-password');
         }
 
         $passwordReset = new PasswordReset();
@@ -219,8 +235,7 @@ class AuthController {
 
         if (!$tokenData) {
             Session::setFlash('error', 'El enlace ha expirado o ya fue usado. Solicita uno nuevo.');
-            header('Location: index.php?page=forgot-password');
-            exit;
+            $this->safeRedirect('index.php?page=forgot-password');
         }
 
         require_once __DIR__ . '/../views/auth/reset_password.php';
@@ -228,14 +243,12 @@ class AuthController {
 
     public function processResetPassword() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: index.php?page=forgot-password');
-            exit;
+            $this->safeRedirect('index.php?page=forgot-password');
         }
 
         if (!Security::validateCSRFToken($_POST['csrf_token'] ?? '')) {
             Session::setFlash('error', 'Token de seguridad inválido');
-            header('Location: index.php?page=forgot-password');
-            exit;
+            $this->safeRedirect('index.php?page=forgot-password');
         }
 
         $token           = Security::sanitize($_POST['token'] ?? '');
@@ -249,25 +262,22 @@ class AuthController {
 
         if ($validator->fails()) {
             Session::setFlash('error', $validator->getFirstError());
-            header('Location: index.php?page=reset-password&token=' . urlencode($token));
-            exit;
+            $this->safeRedirect('index.php?page=reset-password&token=' . urlencode($token));
         }
 
         $passwordReset = new PasswordReset();
         if (!$passwordReset->validateToken($token)) {
             Session::setFlash('error', 'El enlace ha expirado o ya fue usado.');
-            header('Location: index.php?page=forgot-password');
-            exit;
+            $this->safeRedirect('index.php?page=forgot-password');
         }
 
         if ($passwordReset->resetPassword($token, $password)) {
             Session::setFlash('success', '¡Contraseña restablecida! Ya puedes iniciar sesión.');
-            header('Location: index.php?page=login');
+            $this->safeRedirect('index.php?page=login');
         } else {
             Session::setFlash('error', 'Error al restablecer la contraseña. Intenta de nuevo.');
-            header('Location: index.php?page=forgot-password');
+            $this->safeRedirect('index.php?page=forgot-password');
         }
-        exit;
     }
 
     // =========================================================================
@@ -280,7 +290,6 @@ class AuthController {
      *   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM, APP_URL
      */
     private function sendResetEmail($email, $username, $token) {
-
         // Autoload de Composer (PHPMailer)
         $autoload = __DIR__ . '/../vendor/autoload.php';
         if (!file_exists($autoload)) {

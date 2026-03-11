@@ -1,19 +1,35 @@
 <?php
 // ============================================================================
-// UBICACIÓN: C:/xampp/htdocs/gestor-notas/helpers/Security.php
+// UBICACIÓN: /app/helpers/Security.php (o la ruta correspondiente en Railway)
 // DESCRIPCIÓN: Funciones de seguridad (CSRF, XSS, sanitización, validación)
+// CORREGIDO: Errores de headers already sent y regeneración de sesión
 // ============================================================================
 
 class Security {
+    
+    /**
+     * Iniciar sesión de manera segura si no está iniciada
+     * Esta función auxiliar evita duplicar código
+     */
+    private static function secureSessionStart() {
+        if (session_status() === PHP_SESSION_NONE) {
+            // Asegurar que no haya salida antes de iniciar sesión
+            if (!headers_sent()) {
+                session_start();
+            } else {
+                // Si ya se enviaron headers, no podemos iniciar sesión
+                // Esto debería loguearse para depuración
+                error_log("ADVERTENCIA: No se pudo iniciar sesión - headers ya enviados");
+            }
+        }
+    }
     
     /**
      * Generar token CSRF
      * @return string
      */
     public static function generateCSRFToken() {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        self::secureSessionStart();
         
         if (empty($_SESSION['csrf_token'])) {
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -28,9 +44,7 @@ class Security {
      * @return bool
      */
     public static function validateCSRFToken($token) {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        self::secureSessionStart();
         
         if (!isset($_SESSION['csrf_token'])) {
             return false;
@@ -184,12 +198,142 @@ class Security {
     }
     
     /**
-     * Regenerar ID de sesión (prevenir session fixation)
+     * === CORRECCIÓN: Regenerar ID de sesión de forma segura ===
+     * Versión mejorada que previene errores de "headers already sent"
+     * y sigue buenas prácticas de seguridad
+     * 
+     * @param bool $deleteOldSession Eliminar datos de sesión antigua
+     * @return bool True si se regeneró, False si no fue posible
      */
-    public static function regenerateSession() {
-        if (session_status() === PHP_SESSION_ACTIVE) {
-            session_regenerate_id(true);
+    public static function regenerateSession($deleteOldSession = true) {
+        // Verificar si la sesión está activa
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            // Intentar iniciar sesión si no hay headers enviados
+            if (!headers_sent()) {
+                session_start();
+            } else {
+                error_log("Security::regenerateSession: No se puede iniciar sesión - headers ya enviados");
+                return false;
+            }
         }
+        
+        // Verificar nuevamente si la sesión está activa
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            error_log("Security::regenerateSession: No se pudo activar la sesión");
+            return false;
+        }
+        
+        // Verificar si podemos regenerar (no headers sent)
+        if (headers_sent()) {
+            error_log("Security::regenerateSession: No se puede regenerar - headers ya enviados");
+            
+            // Estrategia alternativa: marcar para regenerar en el próximo request
+            $_SESSION['needs_regeneration'] = true;
+            return false;
+        }
+        
+        // Guardar datos de sesión actual si es necesario
+        $sessionData = $_SESSION;
+        
+        // Regenerar ID de sesión
+        $regenerated = session_regenerate_id($deleteOldSession);
+        
+        if ($regenerated) {
+            // Si teníamos datos que restaurar, los restauramos
+            if (!$deleteOldSession && !empty($sessionData)) {
+                $_SESSION = $sessionData;
+            }
+            
+            // Eliminar bandera de regeneración pendiente si existe
+            unset($_SESSION['needs_regeneration']);
+            
+            error_log("Security::regenerateSession: ID de sesión regenerado exitosamente");
+        } else {
+            error_log("Security::regenerateSession: Falló la regeneración del ID de sesión");
+        }
+        
+        return $regenerated;
+    }
+    
+    /**
+     * === NUEVO: Regenerar sesión si es necesario ===
+     * Esta función debe llamarse al principio de páginas sensibles
+     * para regenerar la sesión si quedó pendiente
+     */
+    public static function regenerateIfNeeded() {
+        if (session_status() === PHP_SESSION_ACTIVE && 
+            isset($_SESSION['needs_regeneration']) && 
+            $_SESSION['needs_regeneration'] === true) {
+            
+            unset($_SESSION['needs_regeneration']);
+            self::regenerateSession(true);
+        }
+    }
+    
+    /**
+     * === NUEVO: Destruir sesión de forma segura ===
+     * Para logout sin errores de headers
+     * 
+     * @return bool
+     */
+    public static function destroySession() {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            // Limpiar variable de sesión
+            $_SESSION = [];
+            
+            // Eliminar cookie de sesión
+            if (ini_get("session.use_cookies")) {
+                $params = session_get_cookie_params();
+                setcookie(
+                    session_name(),
+                    '',
+                    time() - 42000,
+                    $params["path"],
+                    $params["domain"],
+                    $params["secure"],
+                    $params["httponly"]
+                );
+            }
+            
+            // Destruir sesión
+            if (!headers_sent()) {
+                session_destroy();
+                return true;
+            } else {
+                error_log("Security::destroySession: No se pudo destruir - headers ya enviados");
+                // Marcar para destruir en el próximo request
+                $_SESSION['needs_destruction'] = true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * === NUEVO: Establecer mensaje flash ===
+     * Mensaje que persiste solo un request (útil para redirecciones)
+     * 
+     * @param string $key Tipo de mensaje (success, error, info)
+     * @param string $message Contenido del mensaje
+     */
+    public static function setFlashMessage($key, $message) {
+        self::secureSessionStart();
+        $_SESSION['flash'][$key] = $message;
+    }
+    
+    /**
+     * === NUEVO: Obtener y limpiar mensaje flash ===
+     * 
+     * @param string $key Tipo de mensaje
+     * @return string|null
+     */
+    public static function getFlashMessage($key) {
+        self::secureSessionStart();
+        if (isset($_SESSION['flash'][$key])) {
+            $message = $_SESSION['flash'][$key];
+            unset($_SESSION['flash'][$key]);
+            return $message;
+        }
+        return null;
     }
     
     // ============================================================================
@@ -203,8 +347,9 @@ class Security {
     //   - Documentación clara de contexto de uso para sanitize()
     //   - bcrypt con cost=12 cumple punto 4 del PDF
     //   - CSRF con hash_equals() cumple punto 6 del PDF
+    //   - CORRECCIÓN: regenerateSession() segura sin headers issues
+    //   - NUEVO: Métodos para manejo seguro de sesiones en producción
     // Reversión: Eliminar métodos nuevos y este bloque si es necesario
     // ============================================================================
 }
 ?>
-    
