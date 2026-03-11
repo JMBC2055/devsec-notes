@@ -2,7 +2,7 @@
 // ============================================================================
 // UBICACIÓN: gestor-notas/controllers/AuthController.php
 // DESCRIPCIÓN: Controlador de autenticación + Recuperación de contraseña
-// VERSIÓN: 4.0 - CORREGIDO para usar Resend API
+// VERSIÓN: 4.1 - CORREGIDO para Resend v0.1.0
 // ============================================================================
 
 require_once __DIR__ . '/../models/User.php';
@@ -11,8 +11,7 @@ require_once __DIR__ . '/../helpers/Session.php';
 require_once __DIR__ . '/../helpers/Security.php';
 require_once __DIR__ . '/../helpers/Validator.php';
 
-// Resend PHP SDK
-use Resend\Client as ResendClient;
+// Resend PHP SDK - No necesitas el "use" para esta versión
 
 class AuthController {
 
@@ -38,7 +37,7 @@ class AuthController {
     }
 
     // =========================================================================
-    // REGISTRO (sin cambios - igual que antes)
+    // REGISTRO
     // =========================================================================
 
     public function showRegister() {
@@ -102,7 +101,7 @@ class AuthController {
     }
 
     // =========================================================================
-    // LOGIN / LOGOUT (sin cambios - igual que antes)
+    // LOGIN / LOGOUT
     // =========================================================================
 
     public function showLogin() {
@@ -159,7 +158,7 @@ class AuthController {
     }
 
     // =========================================================================
-    // RECUPERACIÓN DE CONTRASEÑA (con cambios menores)
+    // RECUPERACIÓN DE CONTRASEÑA
     // =========================================================================
 
     public function showForgotPassword() {
@@ -265,7 +264,7 @@ class AuthController {
     }
 
     // =========================================================================
-    // NUEVO: EMAIL CON RESEND API (Reemplaza a PHPMailer)
+    // EMAIL CON RESEND API - VERSIÓN CORREGIDA PARA v0.1.0
     // =========================================================================
 
     /**
@@ -294,12 +293,12 @@ class AuthController {
         error_log("[EMAIL_DEBUG] Intentando enviar con Resend a: $email");
 
         try {
-            // Inicializar cliente de Resend
-            $resend = ResendClient::client($apiKey);
-
-            // Enviar el email usando la API [citation:1]
+            // 🔴 CORRECCIÓN: Sintaxis correcta para Resend v0.1.0
+            $resend = new \Resend\Client($apiKey);
+            
+            // Enviar el email usando la API
             $result = $resend->emails->send([
-                'from' => 'Gestor de Notas <onboarding@resend.dev>', // Email temporal de Resend
+                'from' => 'Gestor de Notas <onboarding@resend.dev>',
                 'to' => [$email],
                 'subject' => 'Recuperación de contraseña - Gestor de Notas',
                 'html' => $this->getEmailTemplate($username, $resetLink),
@@ -316,7 +315,7 @@ class AuthController {
     }
 
     /**
-     * Template HTML para email de recuperación (igual que antes)
+     * Template HTML para email de recuperación
      */
     private function getEmailTemplate($username, $resetLink) {
         return '
