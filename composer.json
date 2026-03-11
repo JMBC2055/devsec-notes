@@ -5,7 +5,8 @@
     "require": {
         "php": ">=8.0",
         "phpmailer/phpmailer": "^6.9",
-        "resend/resend-php": "^0.1.0"
+        "resend/resend-php": "^0.1.0",
+        "guzzlehttp/guzzle": "^7.10"
     },
     "autoload": {
         "psr-4": {
