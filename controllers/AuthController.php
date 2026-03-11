@@ -2,7 +2,7 @@
 // ============================================================================
 // UBICACIÓN: gestor-notas/controllers/AuthController.php
 // DESCRIPCIÓN: Controlador de autenticación + Recuperación de contraseña
-// VERSIÓN: 4.1 - CORREGIDO para Resend v0.1.0
+// VERSIÓN: 4.2 - CORREGIDO DEFINITIVO para Resend v0.1.0 con HttpTransporter
 // ============================================================================
 
 require_once __DIR__ . '/../models/User.php';
@@ -11,7 +11,7 @@ require_once __DIR__ . '/../helpers/Session.php';
 require_once __DIR__ . '/../helpers/Security.php';
 require_once __DIR__ . '/../helpers/Validator.php';
 
-// Resend PHP SDK - No necesitas el "use" para esta versión
+// Resend PHP SDK - No necesitas "use" para esta versión
 
 class AuthController {
 
@@ -264,11 +264,11 @@ class AuthController {
     }
 
     // =========================================================================
-    // EMAIL CON RESEND API - VERSIÓN CORREGIDA PARA v0.1.0
+    // EMAIL CON RESEND API - VERSIÓN DEFINITIVA CORREGIDA
     // =========================================================================
 
     /**
-     * Enviar email de recuperación usando Resend API
+     * Enviar email de recuperación usando Resend API - VERSIÓN CORREGIDA DEFINITIVA
      */
     private function sendResetEmail($email, $username, $token) {
         // Verificar que el autoload existe
@@ -293,8 +293,15 @@ class AuthController {
         error_log("[EMAIL_DEBUG] Intentando enviar con Resend a: $email");
 
         try {
-            // 🔴 CORRECCIÓN: Sintaxis correcta para Resend v0.1.0
-            $resend = new \Resend\Client($apiKey);
+            // 🔴 CORRECCIÓN DEFINITIVA: Usar HttpTransporter con la API Key
+            // Crear el transporter con la API key
+            $transporter = new \Resend\Transporter\HttpTransporter(
+                \Resend\ValueObjects\ApiKey::from($apiKey),
+                new \GuzzleHttp\Client()
+            );
+            
+            // Inicializar el cliente de Resend con el transporter
+            $resend = new \Resend\Client($transporter);
             
             // Enviar el email usando la API
             $result = $resend->emails->send([
