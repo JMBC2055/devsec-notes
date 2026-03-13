@@ -2,7 +2,7 @@
 // ============================================================================
 // UBICACIÓN: gestor-notas/controllers/AuthController.php
 // DESCRIPCIÓN: Controlador de autenticación + Recuperación de contraseña
-// VERSIÓN: 5.0 - SMTP Gmail con PHPMailer (compatible con Railway)
+// VERSIÓN: 6.0 - Mailjet API HTTP (compatible con Railway)
 // ============================================================================
 
 require_once __DIR__ . '/../models/User.php';
@@ -10,12 +10,6 @@ require_once __DIR__ . '/../models/PasswordReset.php';
 require_once __DIR__ . '/../helpers/Session.php';
 require_once __DIR__ . '/../helpers/Security.php';
 require_once __DIR__ . '/../helpers/Validator.php';
-
-// Cargar Composer (PHPMailer)
-require_once __DIR__ . '/../vendor/autoload.php';
-
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
 
 class AuthController {
 
@@ -147,7 +141,6 @@ class AuthController {
             Session::set('email',    $userData['email']);
 
             Session::setFlash('success', '¡Bienvenido, ' . $userData['username'] . '!');
-
             $this->safeRedirect('index.php?page=dashboard');
         } else {
             Session::setFlash('error', 'Credenciales incorrectas o cuenta bloqueada');
@@ -196,7 +189,6 @@ class AuthController {
 
         if ($userData) {
             $token = $passwordReset->createToken($userData['id']);
-
             if ($token) {
                 $sent = $this->sendResetEmail($email, $userData['username'], $token);
                 if (!$sent) {
@@ -205,6 +197,7 @@ class AuthController {
             }
         }
 
+        // Siempre mostrar el mismo mensaje (evita enumerar usuarios)
         Session::setFlash('success', 'Si el email está registrado, recibirás un enlace en breve. Revisa también tu carpeta de spam.');
         $this->safeRedirect('index.php?page=forgot-password');
     }
@@ -269,60 +262,59 @@ class AuthController {
     }
 
     // =========================================================================
-    // ENVÍO DE EMAIL CON GMAIL SMTP
+    // ENVÍO DE EMAIL CON MAILJET API (compatible con Railway)
     // =========================================================================
 
     private function sendResetEmail($email, $username, $token) {
+        $apiKey    = getenv('MAILJET_API_KEY');
+        $secretKey = getenv('MAILJET_SECRET_KEY');
+        $appUrl    = rtrim(getenv('APP_URL'), '/');
+        $resetLink = $appUrl . '/index.php?page=reset-password&token=' . urlencode($token);
 
-        $mail = new PHPMailer(true);
+        $data = json_encode([
+            'Messages' => [[
+                'From'     => ['Email' => getenv('EMAIL_USER'), 'Name' => 'Gestor de Notas'],
+                'To'       => [['Email' => $email, 'Name' => $username]],
+                'Subject'  => 'Recuperación de contraseña - Gestor de Notas',
+                'HTMLPart' => $this->getEmailTemplate($username, $resetLink),
+                'TextPart' => "Hola $username,\n\nRecupera tu contraseña aquí:\n$resetLink\n\nEste enlace expira en 30 minutos."
+            ]]
+        ]);
 
-        try {
+        $ch = curl_init('https://api.mailjet.com/v3.1/send');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_USERPWD, "$apiKey:$secretKey");
 
-            $mail->isSMTP();
-            $mail->Host       = getenv('SMTP_HOST');
-            $mail->SMTPAuth   = true;
-            $mail->Username   = getenv('EMAIL_USER');
-            $mail->Password   = getenv('EMAIL_PASS');
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-            $mail->Port       = getenv('SMTP_PORT');
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
 
-            $mail->setFrom(getenv('EMAIL_USER'), 'Gestor de Notas');
-            $mail->addAddress($email, $username);
-
-            $appUrl = rtrim(getenv('APP_URL'), '/');
-
-            $resetLink = $appUrl . '/index.php?page=reset-password&token=' . urlencode($token);
-
-            $mail->isHTML(true);
-
-            $mail->Subject = 'Recuperación de contraseña - Gestor de Notas';
-
-            $mail->Body = $this->getEmailTemplate($username, $resetLink);
-
-            $mail->AltBody = "Hola $username,\n\nRecupera tu contraseña aquí:\n$resetLink\n\nEste enlace expira en 30 minutos.";
-
-            $mail->send();
-
+        if ($httpCode === 200) {
             error_log("[EMAIL_SUCCESS] Correo enviado a: $email");
-
             return true;
-
-        } catch (Exception $e) {
-
-            error_log("[EMAIL_ERROR] " . $mail->ErrorInfo);
-
-            return false;
         }
+
+        error_log("[EMAIL_ERROR] Mailjet respondió: $httpCode - $response");
+        return false;
     }
 
     private function getEmailTemplate($username, $resetLink) {
-
         return "
-        <h2>🔐 Recuperación de Contraseña</h2>
-        <p>Hola <strong>$username</strong>,</p>
-        <p>Haz clic en el siguiente enlace para restablecer tu contraseña:</p>
-        <p><a href='$resetLink'>$resetLink</a></p>
-        <p>Este enlace expira en 30 minutos.</p>
+        <div style='font-family: Arial, sans-serif; max-width: 500px; margin: auto;'>
+            <h2 style='color: #333;'>🔐 Recuperación de Contraseña</h2>
+            <p>Hola <strong>" . htmlspecialchars($username, ENT_QUOTES, 'UTF-8') . "</strong>,</p>
+            <p>Haz clic en el siguiente botón para restablecer tu contraseña:</p>
+            <p style='text-align: center;'>
+                <a href='" . htmlspecialchars($resetLink, ENT_QUOTES, 'UTF-8') . "'
+                   style='background-color:#4F46E5;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;'>
+                   Restablecer contraseña
+                </a>
+            </p>
+            <p style='color:#666; font-size:13px;'>Este enlace expira en 30 minutos. Si no solicitaste esto, ignora este correo.</p>
+        </div>
         ";
     }
 }
