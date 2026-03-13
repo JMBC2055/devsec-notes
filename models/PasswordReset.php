@@ -1,7 +1,8 @@
 <?php
 // ============================================================================
-// UBICACIÓN: C:/xampp/htdocs/devsec-notes/models/PasswordReset.php
+// UBICACIÓN: gestor-notas/models/PasswordReset.php
 // DESCRIPCIÓN: Modelo para recuperación de contraseña
+// VERSIÓN: 2.0 - Fix timezone UTC (compatible con Railway)
 // ============================================================================
 
 require_once __DIR__ . '/../config/database.php';
@@ -12,27 +13,23 @@ class PasswordReset {
     private $conn;
     private $table = 'password_resets';
 
-    // Minutos de validez del token
     const TOKEN_EXPIRY_MINUTES = 30;
 
     public function __construct() {
-        $database = new Database();
+        $database   = new Database();
         $this->conn = $database->getConnection();
     }
 
     /**
      * Generar token seguro y guardarlo en BD
      * Invalida cualquier token anterior del mismo usuario
-     *
-     * @param int $userId
-     * @return string|false  Token generado o false si falla
      */
     public function createToken($userId) {
-        // Eliminar tokens anteriores del usuario
         $this->deleteByUser($userId);
 
         $token     = bin2hex(random_bytes(32)); // 64 caracteres hex
-        $expiresAt = date('Y-m-d H:i:s', time() + self::TOKEN_EXPIRY_MINUTES * 60);
+        // gmdate() usa UTC igual que el servidor MySQL en Railway
+        $expiresAt = gmdate('Y-m-d H:i:s', time() + self::TOKEN_EXPIRY_MINUTES * 60);
 
         $query = "INSERT INTO " . $this->table . " (user_id, token, expires_at)
                   VALUES (:user_id, :token, :expires_at)";
@@ -42,18 +39,11 @@ class PasswordReset {
         $stmt->bindParam(':token',      $token);
         $stmt->bindParam(':expires_at', $expiresAt);
 
-        if ($stmt->execute()) {
-            return $token;
-        }
-
-        return false;
+        return $stmt->execute() ? $token : false;
     }
 
     /**
      * Validar token: existe, no expiró y no fue usado
-     *
-     * @param string $token
-     * @return array|false  Datos del reset o false
      */
     public function validateToken($token) {
         $query = "SELECT pr.*, u.email, u.username
@@ -61,7 +51,7 @@ class PasswordReset {
                   INNER JOIN users u ON pr.user_id = u.id
                   WHERE pr.token = :token
                     AND pr.used = 0
-                    AND pr.expires_at > NOW()
+                    AND pr.expires_at > UTC_TIMESTAMP()
                   LIMIT 1";
 
         $stmt = $this->conn->prepare($query);
@@ -73,10 +63,6 @@ class PasswordReset {
 
     /**
      * Marcar token como usado y actualizar la contraseña del usuario
-     *
-     * @param string $token
-     * @param string $newPassword  Contraseña en texto plano (se hashea aquí)
-     * @return bool
      */
     public function resetPassword($token, $newPassword) {
         $resetData = $this->validateToken($token);
@@ -87,7 +73,6 @@ class PasswordReset {
 
         $hashedPassword = Security::hashPassword($newPassword);
 
-        // Actualizar contraseña
         $updateQuery = "UPDATE users
                         SET password = :password,
                             failed_login_attempts = 0,
@@ -102,7 +87,6 @@ class PasswordReset {
             return false;
         }
 
-        // Marcar token como usado
         $usedQuery = "UPDATE " . $this->table . "
                       SET used = 1
                       WHERE token = :token";
@@ -111,7 +95,6 @@ class PasswordReset {
         $stmt->bindParam(':token', $token);
         $stmt->execute();
 
-        // Log de seguridad
         $this->logSecurityEvent($resetData['user_id'], 'PASSWORD_RESET',
             'Contraseña restablecida via token');
 
@@ -119,10 +102,7 @@ class PasswordReset {
     }
 
     /**
-     * Obtener email del usuario por su email (para buscar si existe)
-     *
-     * @param string $email
-     * @return array|false
+     * Obtener usuario por email
      */
     public function getUserByEmail($email) {
         $query = "SELECT id, username, email FROM users
@@ -137,8 +117,6 @@ class PasswordReset {
 
     /**
      * Eliminar todos los tokens de un usuario
-     *
-     * @param int $userId
      */
     private function deleteByUser($userId) {
         $query = "DELETE FROM " . $this->table . " WHERE user_id = :user_id";
