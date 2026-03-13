@@ -1,7 +1,8 @@
 <?php
 // ============================================================================
-// UBICACIÓN: C:/xampp/htdocs/devsec-notes/controllers/NoteController.php
+// UBICACIÓN: gestor-notas/controllers/NoteController.php
 // DESCRIPCIÓN: Controlador de notas (CRUD completo) + sistema de tags
+// VERSIÓN: 2.0 - Rutas relativas (compatible con Railway)
 // ============================================================================
 
 require_once __DIR__ . '/../models/Note.php';
@@ -12,45 +13,41 @@ require_once __DIR__ . '/../helpers/Validator.php';
 
 class NoteController {
 
-    /**
-     * Verificar autenticación
-     */
     private function checkAuth() {
         if (!Session::isAuthenticated()) {
-            header('Location: /devsec-notes/public/index.php?page=login');
+            header('Location: index.php?page=login');
             exit;
         }
     }
 
-    /**
-     * Dashboard - Mostrar todas las notas
-     */
+    // =========================================================================
+    // DASHBOARD
+    // =========================================================================
+
     public function index() {
         $this->checkAuth();
 
-        $userId = Session::get('user_id');
-        $note   = new Note();
-        $tag    = new Tag();
+        $userId  = Session::get('user_id');
+        $note    = new Note();
+        $tag     = new Tag();
 
-        $notes    = $note->getAllByUser($userId, false);
-        $allTags  = $tag->getAllByUser($userId);
+        $notes   = $note->getAllByUser($userId, false);
+        $allTags = $tag->getAllByUser($userId);
 
-        // Adjuntar tags a cada nota
         foreach ($notes as &$n) {
             $n['tags'] = $tag->getByNote($n['id']);
         }
         unset($n);
 
-        // Filtrar por tag si se pasa ?tag_id=X
         $filterTagId = isset($_GET['tag_id']) ? (int)$_GET['tag_id'] : null;
         $filterTag   = null;
+
         if ($filterTagId) {
             $notes = $tag->getNotesByTag($userId, $filterTagId);
             foreach ($notes as &$n) {
                 $n['tags'] = $tag->getByNote($n['id']);
             }
             unset($n);
-            // Buscar nombre del tag activo
             foreach ($allTags as $t) {
                 if ($t['id'] == $filterTagId) {
                     $filterTag = $t;
@@ -62,9 +59,10 @@ class NoteController {
         require_once __DIR__ . '/../views/notes/index.php';
     }
 
-    /**
-     * Mostrar formulario de crear nota
-     */
+    // =========================================================================
+    // CREAR NOTA
+    // =========================================================================
+
     public function create() {
         $this->checkAuth();
         $userId  = Session::get('user_id');
@@ -73,21 +71,17 @@ class NoteController {
         require_once __DIR__ . '/../views/notes/create.php';
     }
 
-    /**
-     * Guardar nueva nota
-     */
     public function store() {
         $this->checkAuth();
 
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: /devsec-notes/public/index.php?page=dashboard');
+            header('Location: index.php?page=dashboard');
             exit;
         }
 
-        // Validar CSRF
         if (!Security::validateCSRFToken($_POST['csrf_token'] ?? '')) {
             Session::setFlash('error', 'Token de seguridad inválido');
-            header('Location: /devsec-notes/public/index.php?page=create-note');
+            header('Location: index.php?page=create-note');
             exit;
         }
 
@@ -104,74 +98,70 @@ class NoteController {
 
         if ($validator->fails()) {
             Session::setFlash('error', $validator->getFirstError());
-            header('Location: /devsec-notes/public/index.php?page=create-note');
+            header('Location: index.php?page=create-note');
             exit;
         }
 
-        $note              = new Note();
-        $note->user_id     = Session::get('user_id');
-        $note->title       = $title;
-        $note->content     = $content;
-        $note->is_favorite = $isFavorite;
+        $note                = new Note();
+        $note->user_id       = Session::get('user_id');
+        $note->title         = $title;
+        $note->content       = $content;
+        $note->is_favorite   = $isFavorite;
         $note->reminder_date = $reminderDate;
 
         $noteId = $note->create();
 
         if ($noteId) {
-            // Guardar tags seleccionados
             if (!empty($tagIds)) {
                 $tag = new Tag();
                 $tag->syncToNote($noteId, $tagIds);
             }
             Session::setFlash('success', 'Nota creada exitosamente');
-            header('Location: /devsec-notes/public/index.php?page=dashboard');
+            header('Location: index.php?page=dashboard');
         } else {
             Session::setFlash('error', 'Error al crear la nota');
-            header('Location: /devsec-notes/public/index.php?page=create-note');
+            header('Location: index.php?page=create-note');
         }
         exit;
     }
 
-    /**
-     * Mostrar formulario de editar nota
-     */
+    // =========================================================================
+    // EDITAR NOTA
+    // =========================================================================
+
     public function edit() {
         $this->checkAuth();
 
-        $noteId = $_GET['id'] ?? 0;
-        $userId = Session::get('user_id');
-
+        $noteId    = $_GET['id'] ?? 0;
+        $userId    = Session::get('user_id');
         $noteModel = new Note();
         $note      = $noteModel->getById($noteId, $userId);
 
         if (!$note) {
             Session::setFlash('error', 'Nota no encontrada');
-            header('Location: /devsec-notes/public/index.php?page=dashboard');
+            header('Location: index.php?page=dashboard');
             exit;
         }
 
-        $tag         = new Tag();
-        $allTags     = $tag->getAllByUser($userId);
-        $noteTags    = $tag->getByNote($noteId);
-        $noteTagIds  = array_column($noteTags, 'id');
+        $tag        = new Tag();
+        $allTags    = $tag->getAllByUser($userId);
+        $noteTags   = $tag->getByNote($noteId);
+        $noteTagIds = array_column($noteTags, 'id');
 
         require_once __DIR__ . '/../views/notes/edit.php';
     }
 
-    /**
-     * Actualizar nota
-     */
     public function update() {
         $this->checkAuth();
 
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: /devsec-notes/public/index.php?page=dashboard');
+            header('Location: index.php?page=dashboard');
             exit;
         }
 
         if (!Security::validateCSRFToken($_POST['csrf_token'] ?? '')) {
             Session::setFlash('error', 'Token de seguridad inválido');
-            header('Location: /devsec-notes/public/index.php?page=dashboard');
+            header('Location: index.php?page=dashboard');
             exit;
         }
 
@@ -190,33 +180,32 @@ class NoteController {
 
         if ($validator->fails()) {
             Session::setFlash('error', $validator->getFirstError());
-            header('Location: /devsec-notes/public/index.php?page=edit-note&id=' . $noteId);
+            header('Location: index.php?page=edit-note&id=' . $noteId);
             exit;
         }
 
-        $note              = new Note();
-        $note->title       = $title;
-        $note->content     = $content;
-        $note->is_favorite = $isFavorite;
+        $note                = new Note();
+        $note->title         = $title;
+        $note->content       = $content;
+        $note->is_favorite   = $isFavorite;
         $note->reminder_date = $reminderDate;
 
         if ($note->update($noteId, $userId)) {
-            // Sincronizar tags
             $tag = new Tag();
             $tag->syncToNote($noteId, $tagIds);
-
             Session::setFlash('success', 'Nota actualizada exitosamente');
-            header('Location: /devsec-notes/public/index.php?page=dashboard');
+            header('Location: index.php?page=dashboard');
         } else {
             Session::setFlash('error', 'Error al actualizar la nota');
-            header('Location: /devsec-notes/public/index.php?page=edit-note&id=' . $noteId);
+            header('Location: index.php?page=edit-note&id=' . $noteId);
         }
         exit;
     }
 
-    /**
-     * Eliminar nota
-     */
+    // =========================================================================
+    // ELIMINAR / ARCHIVAR NOTA
+    // =========================================================================
+
     public function delete() {
         $this->checkAuth();
 
@@ -230,13 +219,10 @@ class NoteController {
             Session::setFlash('error', 'Error al eliminar la nota');
         }
 
-        header('Location: /devsec-notes/public/index.php?page=dashboard');
+        header('Location: index.php?page=dashboard');
         exit;
     }
 
-    /**
-     * Archivar nota
-     */
     public function archive() {
         $this->checkAuth();
 
@@ -250,13 +236,14 @@ class NoteController {
             Session::setFlash('error', 'Error al archivar la nota');
         }
 
-        header('Location: /devsec-notes/public/index.php?page=dashboard');
+        header('Location: index.php?page=dashboard');
         exit;
     }
 
-    /**
-     * Buscar notas
-     */
+    // =========================================================================
+    // BUSCAR NOTAS
+    // =========================================================================
+
     public function search() {
         $this->checkAuth();
 
@@ -275,22 +262,21 @@ class NoteController {
         require_once __DIR__ . '/../views/notes/search.php';
     }
 
-    // ==================== TAGS ====================
+    // =========================================================================
+    // TAGS
+    // =========================================================================
 
-    /**
-     * Crear nuevo tag (AJAX / POST)
-     */
     public function storeTag() {
         $this->checkAuth();
 
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: /devsec-notes/public/index.php?page=dashboard');
+            header('Location: index.php?page=dashboard');
             exit;
         }
 
         if (!Security::validateCSRFToken($_POST['csrf_token'] ?? '')) {
             Session::setFlash('error', 'Token de seguridad inválido');
-            header('Location: /devsec-notes/public/index.php?page=manage-tags');
+            header('Location: index.php?page=manage-tags');
             exit;
         }
 
@@ -302,14 +288,14 @@ class NoteController {
 
         if (empty($name) || strlen($name) > 50) {
             Session::setFlash('error', 'El nombre del tag es inválido (máx. 50 caracteres)');
-            header('Location: /devsec-notes/public/index.php?page=manage-tags');
+            header('Location: index.php?page=manage-tags');
             exit;
         }
 
-        $tag           = new Tag();
-        $tag->user_id  = $userId;
-        $tag->name     = $name;
-        $tag->color    = $color;
+        $tag          = new Tag();
+        $tag->user_id = $userId;
+        $tag->name    = $name;
+        $tag->color   = $color;
 
         if ($tag->create()) {
             Session::setFlash('success', "Tag \"$name\" creado correctamente");
@@ -317,13 +303,10 @@ class NoteController {
             Session::setFlash('error', "Ya existe un tag con el nombre \"$name\"");
         }
 
-        header('Location: /devsec-notes/public/index.php?page=manage-tags');
+        header('Location: index.php?page=manage-tags');
         exit;
     }
 
-    /**
-     * Eliminar tag
-     */
     public function deleteTag() {
         $this->checkAuth();
 
@@ -337,13 +320,10 @@ class NoteController {
             Session::setFlash('error', 'Error al eliminar el tag');
         }
 
-        header('Location: /devsec-notes/public/index.php?page=manage-tags');
+        header('Location: index.php?page=manage-tags');
         exit;
     }
 
-    /**
-     * Página de gestión de tags
-     */
     public function manageTags() {
         $this->checkAuth();
 
