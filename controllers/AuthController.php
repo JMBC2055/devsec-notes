@@ -2,7 +2,7 @@
 // ============================================================================
 // UBICACIÓN: gestor-notas/controllers/AuthController.php
 // DESCRIPCIÓN: Controlador de autenticación + Recuperación de contraseña
-// VERSIÓN: 7.0 - Brevo API HTTP (compatible con Railway)
+// VERSIÓN: 8.0 - Brevo API HTTP (compatible con Railway)
 // ============================================================================
 
 require_once __DIR__ . '/../models/User.php';
@@ -218,6 +218,8 @@ class AuthController {
             $this->safeRedirect('index.php?page=forgot-password');
         }
 
+        // Pasar variables a la vista
+        $resetData = $tokenData;
         require_once __DIR__ . '/../views/auth/reset_password.php';
     }
 
@@ -231,6 +233,7 @@ class AuthController {
             $this->safeRedirect('index.php?page=forgot-password');
         }
 
+        // La vista usa name="token" 
         $token           = Security::sanitize($_POST['token'] ?? '');
         $password        = $_POST['password'] ?? '';
         $confirmPassword = $_POST['confirm_password'] ?? '';

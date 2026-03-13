@@ -1,8 +1,7 @@
 <?php
 // ============================================================================
-// UBICACIÓN: C:/xampp/htdocs/devsec-notes/views/auth/reset_password.php
+// UBICACIÓN: gestor-notas/views/auth/reset_password.php
 // DESCRIPCIÓN: Formulario para ingresar la nueva contraseña
-// Variables disponibles: $token (string), $resetData (array con email/username)
 // ============================================================================
 
 require_once __DIR__ . '/../../helpers/Security.php';
@@ -21,7 +20,7 @@ require_once __DIR__ . '/../../helpers/Security.php';
 
             <h1>🔒 Nueva Contraseña</h1>
             <p class="subtitle">
-                Hola <strong><?= htmlspecialchars($resetData['username']) ?></strong>,
+                Hola <strong><?= htmlspecialchars($resetData['username'] ?? '') ?></strong>,
                 elige una contraseña segura para tu cuenta
             </p>
 
@@ -31,8 +30,8 @@ require_once __DIR__ . '/../../helpers/Security.php';
 
             <form action="index.php?page=reset-password-process" method="POST" class="auth-form">
 
-                <input type="hidden" name="csrf_token"   value="<?= Security::generateCSRFToken() ?>">
-                <input type="hidden" name="reset_token"  value="<?= htmlspecialchars($token) ?>">
+                <input type="hidden" name="csrf_token" value="<?= Security::generateCSRFToken() ?>">
+                <input type="hidden" name="token"      value="<?= htmlspecialchars($token ?? '') ?>">
 
                 <!-- Nueva contraseña -->
                 <div class="form-group">
@@ -73,26 +72,25 @@ require_once __DIR__ . '/../../helpers/Security.php';
     </div>
 
     <script>
-    // Indicador de fortaleza de contraseña
     document.getElementById('password').addEventListener('input', function () {
-        const val   = this.value;
-        const bar   = document.getElementById('strength-bar');
-        const text  = document.getElementById('strength-text');
+        const val  = this.value;
+        const bar  = document.getElementById('strength-bar');
+        const text = document.getElementById('strength-text');
 
         let score = 0;
-        if (val.length >= 8)              score++;
-        if (/[A-Z]/.test(val))            score++;
-        if (/[a-z]/.test(val))            score++;
-        if (/[0-9]/.test(val))            score++;
-        if (/[^A-Za-z0-9]/.test(val))     score++;
+        if (val.length >= 8)          score++;
+        if (/[A-Z]/.test(val))        score++;
+        if (/[a-z]/.test(val))        score++;
+        if (/[0-9]/.test(val))        score++;
+        if (/[^A-Za-z0-9]/.test(val)) score++;
 
         const levels = [
-            { label: '',          color: '#e5e7eb', pct: '0%'   },
-            { label: 'Muy débil', color: '#ef4444', pct: '20%'  },
-            { label: 'Débil',     color: '#f97316', pct: '40%'  },
-            { label: 'Regular',   color: '#eab308', pct: '60%'  },
-            { label: 'Fuerte',    color: '#22c55e', pct: '80%'  },
-            { label: 'Muy fuerte',color: '#16a34a', pct: '100%' },
+            { label: '',           color: '#e5e7eb', pct: '0%'   },
+            { label: 'Muy débil',  color: '#ef4444', pct: '20%'  },
+            { label: 'Débil',      color: '#f97316', pct: '40%'  },
+            { label: 'Regular',    color: '#eab308', pct: '60%'  },
+            { label: 'Fuerte',     color: '#22c55e', pct: '80%'  },
+            { label: 'Muy fuerte', color: '#16a34a', pct: '100%' },
         ];
 
         bar.style.width      = levels[score].pct;
