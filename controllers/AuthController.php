@@ -2,7 +2,7 @@
 // ============================================================================
 // UBICACIÓN: gestor-notas/controllers/AuthController.php
 // DESCRIPCIÓN: Controlador de autenticación + Recuperación de contraseña
-// VERSIÓN: 6.0 - Mailjet API HTTP (compatible con Railway)
+// VERSIÓN: 7.0 - Brevo API HTTP (compatible con Railway)
 // ============================================================================
 
 require_once __DIR__ . '/../models/User.php';
@@ -262,42 +262,47 @@ class AuthController {
     }
 
     // =========================================================================
-    // ENVÍO DE EMAIL CON MAILJET API (compatible con Railway)
+    // ENVÍO DE EMAIL CON BREVO API (compatible con Railway)
     // =========================================================================
 
     private function sendResetEmail($email, $username, $token) {
-        $apiKey    = getenv('MAILJET_API_KEY');
-        $secretKey = getenv('MAILJET_SECRET_KEY');
+        $apiKey    = getenv('BREVO_API_KEY');
         $appUrl    = rtrim(getenv('APP_URL'), '/');
         $resetLink = $appUrl . '/index.php?page=reset-password&token=' . urlencode($token);
 
         $data = json_encode([
-            'Messages' => [[
-                'From'     => ['Email' => getenv('EMAIL_USER'), 'Name' => 'Gestor de Notas'],
-                'To'       => [['Email' => $email, 'Name' => $username]],
-                'Subject'  => 'Recuperación de contraseña - Gestor de Notas',
-                'HTMLPart' => $this->getEmailTemplate($username, $resetLink),
-                'TextPart' => "Hola $username,\n\nRecupera tu contraseña aquí:\n$resetLink\n\nEste enlace expira en 30 minutos."
-            ]]
+            'sender'      => [
+                'email' => getenv('EMAIL_USER'),
+                'name'  => 'Gestor de Notas'
+            ],
+            'to'          => [[
+                'email' => $email,
+                'name'  => $username
+            ]],
+            'subject'     => 'Recuperación de contraseña - Gestor de Notas',
+            'htmlContent' => $this->getEmailTemplate($username, $resetLink),
+            'textContent' => "Hola $username,\n\nRecupera tu contraseña aquí:\n$resetLink\n\nEste enlace expira en 30 minutos."
         ]);
 
-        $ch = curl_init('https://api.mailjet.com/v3.1/send');
+        $ch = curl_init('https://api.brevo.com/v3/smtp/email');
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-        curl_setopt($ch, CURLOPT_USERPWD, "$apiKey:$secretKey");
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/json',
+            'api-key: ' . $apiKey
+        ]);
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        if ($httpCode === 200) {
+        if ($httpCode === 201) {
             error_log("[EMAIL_SUCCESS] Correo enviado a: $email");
             return true;
         }
 
-        error_log("[EMAIL_ERROR] Mailjet respondió: $httpCode - $response");
+        error_log("[EMAIL_ERROR] Brevo respondió: $httpCode - $response");
         return false;
     }
 
