@@ -59,10 +59,7 @@ require_once __DIR__ . '/../../helpers/Security.php';
                 <a href="index.php?page=register">Regístrate aquí</a>
             </p>
 
-            <div class="demo-credentials">
-                <small><strong style="color:var(--cream);">Cuenta de prueba</strong></small><br>
-                <small>admin@gestor.local · Test123!</small>
-            </div>
+        
         </div>
     </div>
 </body>
