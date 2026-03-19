@@ -1,9 +1,4 @@
 <?php
-// ============================================================================
-// UBICACIÓN: C:/xampp/htdocs/devsec-notes/views/notes/create.php
-// DESCRIPCIÓN: Formulario para crear nueva nota (con etiquetas)
-// ============================================================================
-
 require_once __DIR__ . '/../../helpers/Security.php';
 ?>
 <!DOCTYPE html>
@@ -11,16 +6,20 @@ require_once __DIR__ . '/../../helpers/Security.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nueva Nota - Gestor de Notas</title>
+    <title>Nueva Nota — Gestor de Notas</title>
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/tags.css">
 </head>
 <body>
     <header class="main-header">
         <div class="container">
-            <h1>📝 Nueva Nota</h1>
+            <h1>
+                <span style="width:32px;height:32px;background:linear-gradient(135deg,#C9A84C,#E2C47A);border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:1rem;">📝</span>
+                Nueva Nota
+            </h1>
             <div class="header-actions">
-                <a href="index.php?page=dashboard" class="btn btn-secondary">← Volver</a>
-                <a href="index.php?page=logout" class="btn btn-secondary">Cerrar Sesión</a>
+                <a href="index.php?page=dashboard" class="btn btn-sm btn-secondary">← Volver</a>
+                <a href="index.php?page=logout" class="btn btn-sm btn-secondary">Salir</a>
             </div>
         </div>
     </header>
@@ -28,7 +27,7 @@ require_once __DIR__ . '/../../helpers/Security.php';
     <main class="container">
 
         <?php if ($error = Session::getFlash('error')): ?>
-            <div class="alert alert-error"><?= htmlspecialchars($error) ?></div>
+            <div class="alert alert-error" style="margin-top:1.5rem;"><?= htmlspecialchars($error) ?></div>
         <?php endif; ?>
 
         <div class="form-container">
@@ -36,32 +35,29 @@ require_once __DIR__ . '/../../helpers/Security.php';
 
                 <input type="hidden" name="csrf_token" value="<?= Security::generateCSRFToken() ?>">
 
-                <!-- Título -->
                 <div class="form-group">
-                    <label for="title">Título *</label>
+                    <label for="title">Título</label>
                     <input type="text" id="title" name="title" required
-                           maxlength="200" placeholder="Título de la nota" autofocus>
+                           maxlength="200" placeholder="Dale un título a tu nota..." autofocus>
                 </div>
 
-                <!-- Contenido -->
                 <div class="form-group">
-                    <label for="content">Contenido *</label>
+                    <label for="content">Contenido</label>
                     <textarea id="content" name="content" required rows="10"
-                              placeholder="Escribe aquí el contenido de tu nota..."></textarea>
+                              placeholder="Escribe aquí tu nota..."></textarea>
                 </div>
 
-                <!-- Etiquetas -->
                 <div class="form-group">
-                    <label>🏷️ Etiquetas
-                        <small style="font-weight:normal; color:var(--text-muted);">
-                            — <a href="index.php?page=manage-tags">Gestionar etiquetas</a>
-                        </small>
+                    <label>
+                        Etiquetas
+                        <a href="index.php?page=manage-tags" style="font-size:0.75rem; font-weight:400; color:var(--muted); text-transform:none; margin-left:8px;">
+                            + Gestionar
+                        </a>
                     </label>
                     <div class="tags-selector">
                         <?php if (empty($allTags)): ?>
                             <span class="tags-selector-empty">
-                                No tienes etiquetas aún.
-                                <a href="index.php?page=manage-tags">Crear una</a>
+                                Sin etiquetas. <a href="index.php?page=manage-tags">Crear una</a>
                             </span>
                         <?php else: ?>
                             <?php foreach ($allTags as $t): ?>
@@ -76,23 +72,20 @@ require_once __DIR__ . '/../../helpers/Security.php';
                     </div>
                 </div>
 
-                <!-- Recordatorio -->
                 <div class="form-group">
                     <label for="reminder_date">Recordatorio (opcional)</label>
                     <input type="datetime-local" id="reminder_date" name="reminder_date">
                 </div>
 
-                <!-- Favorito -->
                 <div class="form-group checkbox-group">
                     <label class="checkbox-label">
                         <input type="checkbox" name="is_favorite" value="1">
-                        <span>⭐ Marcar como favorito</span>
+                        <span>⭐ Marcar como favorita</span>
                     </label>
                 </div>
 
-                <!-- Botones -->
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">💾 Guardar Nota</button>
+                    <button type="submit" class="btn btn-primary">Guardar Nota</button>
                     <a href="index.php?page=dashboard" class="btn btn-secondary">Cancelar</a>
                 </div>
 
@@ -102,7 +95,7 @@ require_once __DIR__ . '/../../helpers/Security.php';
     </main>
 
     <footer class="main-footer">
-        <p>&copy; 2024 Gestor de Notas Seguro - DevSecOps</p>
+        <p>&copy; 2024 Gestor de Notas Seguro</p>
     </footer>
 </body>
 </html>

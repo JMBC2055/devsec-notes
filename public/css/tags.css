@@ -1,105 +1,120 @@
 /* ============================================================================
-   AGREGAR AL FINAL de: public/css/style.css
-   DESCRIPCIÓN: Estilos para el sistema de etiquetas (tags)
+   TAGS — Design System extension
    ============================================================================ */
 
-/* ==================== BADGES DE TAGS ==================== */
+/* ==================== TAG BADGES ==================== */
 .tag-badge {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
     padding: 2px 10px;
     border-radius: 999px;
-    color: #fff;
-    font-size: 0.75rem;
+    color: #0D1B2A;
+    font-size: 0.72rem;
     font-weight: 600;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.03em;
     white-space: nowrap;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
 }
 
 .note-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
-    margin: 0.4rem 0;
+    gap: 5px;
+    margin: 0.35rem 0;
 }
 
-/* ==================== SELECTOR DE TAGS EN FORMULARIO ==================== */
+/* ==================== TAGS SELECTOR (form) ==================== */
 .tags-selector {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    padding: 0.6rem;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    background: var(--bg-color);
-    min-height: 44px;
+    padding: 0.7rem;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    background: rgba(255,255,255,0.03);
+    min-height: 48px;
 }
 
 .tags-selector label {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
     cursor: pointer;
     font-size: 0.85rem;
-    font-weight: normal;
+    font-weight: 400;
+    color: #8A9BB0;
+    transition: color 0.15s;
 }
 
+.tags-selector label:hover { color: #F4EFE6; }
+
 .tags-selector input[type="checkbox"] {
-    accent-color: var(--primary-color);
-    width: 15px;
-    height: 15px;
+    accent-color: #C9A84C;
+    width: 15px; height: 15px;
     cursor: pointer;
 }
 
 .tags-selector-empty {
-    color: var(--text-muted);
+    color: rgba(138,155,176,0.5);
     font-size: 0.85rem;
     font-style: italic;
 }
 
-/* ==================== FILTRO DE TAGS EN DASHBOARD ==================== */
+/* ==================== FILTER BAR ==================== */
 .tags-filter-bar {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    margin-bottom: 1.2rem;
+    margin-bottom: 1.5rem;
     align-items: center;
+    padding: 1rem 1.25rem;
+    background: rgba(22,34,54,0.6);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
 }
 
-.tags-filter-bar span {
-    font-size: 0.85rem;
-    color: var(--text-muted);
+.tags-filter-bar > span {
+    font-size: 0.72rem;
+    color: #8A9BB0;
     font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-right: 4px;
 }
 
 .tag-filter-btn {
-    display: inline-block;
-    padding: 3px 12px;
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 12px;
     border-radius: 999px;
-    color: #fff;
-    font-size: 0.78rem;
+    color: #0D1B2A;
+    font-size: 0.75rem;
     font-weight: 600;
     text-decoration: none;
-    transition: opacity 0.15s;
+    transition: all 0.15s ease;
     border: 2px solid transparent;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.3);
+    letter-spacing: 0.02em;
 }
 
-.tag-filter-btn:hover {
-    opacity: 0.85;
-}
+.tag-filter-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+.tag-filter-btn:active { transform: none; }
 
 .tag-filter-btn.active {
-    border-color: var(--text-color);
+    outline: 2px solid rgba(255,255,255,0.5);
+    outline-offset: 1px;
 }
 
 .tag-filter-all {
-    background: var(--secondary-color);
+    background: #8A9BB0;
+    color: #0D1B2A;
 }
 
-/* ==================== GESTIÓN DE TAGS ==================== */
+/* ==================== TAG MANAGEMENT ==================== */
 .tags-manage-grid {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
     max-width: 700px;
 }
 
@@ -107,12 +122,14 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
+    background: #162236;
+    border: 1px solid rgba(255,255,255,0.06);
     border-radius: 10px;
-    padding: 0.75rem 1rem;
-    box-shadow: var(--shadow);
+    padding: 0.875rem 1.125rem;
+    transition: border-color 0.2s;
 }
+
+.tag-manage-card:hover { border-color: rgba(201,168,76,0.2); }
 
 .tag-manage-left {
     display: flex;
@@ -120,19 +137,17 @@
     gap: 12px;
 }
 
-.tag-manage-right {
-    display: flex;
-    gap: 8px;
-}
+.tag-manage-right { display: flex; gap: 8px; }
 
-/* ==================== ENLACE EN EL HEADER ==================== */
+/* ==================== HEADER TAGS BUTTON ==================== */
 .btn-tags {
     background: transparent;
-    color: var(--primary-color);
-    border: 1px solid var(--primary-color);
+    color: #C9A84C;
+    border: 1px solid rgba(201,168,76,0.35);
 }
 
 .btn-tags:hover {
-    background: var(--primary-color);
-    color: #fff;
+    background: rgba(201,168,76,0.12);
+    border-color: #C9A84C;
+    color: #E2C47A;
 }

@@ -1,9 +1,4 @@
 <?php
-// ============================================================================
-// UBICACIÓN: C:/xampp/htdocs/devsec-notes/views/auth/login.php
-// DESCRIPCIÓN: Vista de login (actualizada con enlace de recuperación)
-// ============================================================================
-
 require_once __DIR__ . '/../../helpers/Security.php';
 ?>
 <!DOCTYPE html>
@@ -11,13 +6,18 @@ require_once __DIR__ . '/../../helpers/Security.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Gestor de Notas</title>
+    <title>Iniciar Sesión — Gestor de Notas</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <div class="auth-container">
         <div class="auth-box">
-            <h1>📝 Gestor de Notas</h1>
+
+            <div class="auth-logo">
+                <div class="auth-logo-icon">📝</div>
+            </div>
+
+            <h1>Gestor de Notas</h1>
             <p class="subtitle">Inicia sesión para continuar</p>
 
             <?php if ($error = Session::getFlash('error')): ?>
@@ -39,10 +39,9 @@ require_once __DIR__ . '/../../helpers/Security.php';
                 </div>
 
                 <div class="form-group">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <label for="password">Contraseña</label>
-                        <a href="index.php?page=forgot-password"
-                           style="font-size:0.82rem; color:var(--primary-color);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.45rem;">
+                        <label for="password" style="margin-bottom:0;">Contraseña</label>
+                        <a href="index.php?page=forgot-password" style="font-size:0.78rem; color:var(--muted);">
                             ¿Olvidaste tu contraseña?
                         </a>
                     </div>
@@ -50,7 +49,7 @@ require_once __DIR__ . '/../../helpers/Security.php';
                            required placeholder="Tu contraseña">
                 </div>
 
-                <button type="submit" class="btn btn-primary btn-block">
+                <button type="submit" class="btn btn-primary btn-block" style="margin-top:0.5rem;">
                     Iniciar Sesión
                 </button>
             </form>
@@ -61,9 +60,8 @@ require_once __DIR__ . '/../../helpers/Security.php';
             </p>
 
             <div class="demo-credentials">
-                <small><strong>Cuenta de prueba:</strong></small><br>
-                <small>Email: admin@gestor.local</small><br>
-                <small>Password: Test123!</small>
+                <small><strong style="color:var(--cream);">Cuenta de prueba</strong></small><br>
+                <small>admin@gestor.local · Test123!</small>
             </div>
         </div>
     </div>
