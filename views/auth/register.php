@@ -54,7 +54,7 @@ require_once __DIR__ . '/../../helpers/Security.php';
 
                 <div class="form-group">
                     <label for="password_confirm">Confirmar contraseña</label>
-                    <input type="password" id="password_confirm" name="password_confirm"
+                    <input type="password" id="password_confirm" name="confirm_password"
                            required placeholder="Repite tu contraseña">
                 </div>
 
